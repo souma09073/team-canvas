@@ -8,6 +8,6 @@ void draw() {
 }
 void mousePressed() {
   if (mouseButton==LEFT) {
-    fill(random(255), random(255), random(255));
+    fill(random(255), random(255), random(25));
   }
 }
