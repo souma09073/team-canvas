@@ -28,21 +28,61 @@
   /* タイム(上中央) */
   #timePanel { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); font-size: 28px; font-weight: bold; text-shadow: 0 0 6px #000; }
 
-  /* 注射(右下) */
-  #shotPanel { position: absolute; right: 18px; bottom: 18px; width: 150px; text-align: center; background: rgba(0,0,0,.55); border-radius: 12px; padding: 12px; }
-  #shotIcon { font-size: 34px; }
+  /* マンジャロ(右下)。状態が4つあるので、色・アイコン・ゲージ・動きの4系統で見分けさせる */
+  #shotPanel { position: absolute; right: 20px; bottom: 20px; width: 220px; text-align: center;
+    background: rgba(0,0,0,.6); border: 3px solid #666; border-radius: 16px; padding: 14px 14px 12px;
+    transition: border-color .12s, background .12s; }
+  #shotIcon { position: relative; font-size: 62px; line-height: 1.05; transition: transform .1s; }
+  #shotTitle { font-size: 17px; font-weight: bold; letter-spacing: .1em; }
   /* textContent に \n で2行入れるので pre-line が要る(無いと1行に繋がる) */
-  #shotState { font-size: 14px; margin-top: 4px; min-height: 36px; white-space: pre-line; }
-  #shotPanel.ready   { outline: 3px solid #6f6; }
-  #shotPanel.cooldown{ outline: 3px solid #999; opacity: .8; }
-  #shotPanel.locked  { outline: 3px solid #f4a; }
-  #shotPanel.active  { outline: 3px solid #3af; }
+  #shotState { font-size: 13px; margin: 3px 0 8px; min-height: 34px; white-space: pre-line; opacity: .9; }
+  #shotBarWrap { height: 9px; border-radius: 5px; background: rgba(255,255,255,.15); overflow: hidden; }
+  #shotBar { height: 100%; width: 100%; background: #6f6; }
 
-  /* 主人公の頭上に追従するミニ血糖バー */
-  #miniGauge { position: fixed; width: 150px; height: 14px; border-radius: 7px;
+  /* 使える:緑に呼吸させて「押していい」を主張する */
+  #shotPanel.ready { border-color: #6f6; background: rgba(0,55,10,.6); animation: shotBreath 1.6s ease-in-out infinite; }
+  @keyframes shotBreath {
+    0%,100% { box-shadow: 0 0 0 0 rgba(110,255,110,.5); }
+    50%     { box-shadow: 0 0 24px 5px rgba(110,255,110,.5); }
+  }
+
+  /* 補充中:灰色に沈めて、ゲージが溜まりきるまで押せないことを示す */
+  #shotPanel.cooldown { border-color: #7a7a86; }
+  #shotPanel.cooldown #shotIcon { filter: grayscale(1); opacity: .45; }
+  #shotPanel.cooldown #shotBar  { background: #8ab4dd; }
+
+  /* 奪われた:揺らして「取り上げられた」感を出す + 注射器に大きな✕ */
+  #shotPanel.locked { border-color: #f4a; background: rgba(85,0,40,.65); animation: shotShake .55s ease-in-out infinite; }
+  #shotPanel.locked #shotIcon { filter: grayscale(1) brightness(.55); }
+  #shotPanel.locked #shotIcon::after {
+    content: "✕"; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    font-size: 72px; font-weight: bold; color: #ff3b6b; text-shadow: 0 0 12px #000;
+  }
+  #shotPanel.locked #shotBar { background: #f4a; }
+  @keyframes shotShake {
+    0%,100% { transform: translateX(0) rotate(0); }
+    20% { transform: translateX(-6px) rotate(-1.6deg); }
+    40% { transform: translateX(6px)  rotate(1.6deg); }
+    60% { transform: translateX(-4px) rotate(-1deg); }
+    80% { transform: translateX(4px)  rotate(1deg); }
+  }
+
+  /* 撃った瞬間:白フチ+水色に弾けさせ、アイコンを一気に拡大する */
+  #shotPanel.firing { border-color: #fff; background: rgba(0,170,255,.8); box-shadow: 0 0 40px 10px rgba(0,200,255,.6); }
+  #shotPanel.firing #shotIcon { transform: scale(1.45) rotate(-12deg); }
+  #shotPanel.firing #shotState { opacity: 1; font-weight: bold; font-size: 15px; }
+  #shotPanel.firing #shotBar { background: #fff; }
+
+  /* 注射した瞬間の画面フチ(前方の食べ物が消えたことを画面全体で伝える) */
+  #shotVignette { position: fixed; inset: 0; box-shadow: inset 0 0 150px 50px rgba(0,200,255,.55);
+    opacity: 0; transition: opacity .3s; }
+  #shotVignette.on { opacity: 1; transition: opacity .04s; }
+
+  /* 主人公の右横に追従するミニ血糖バー(縦向き:下=0 上=100) */
+  #miniGauge { position: fixed; width: 14px; height: 150px; border-radius: 7px;
     border: 2px solid rgba(0,0,0,.65); box-shadow: 0 0 6px rgba(0,0,0,.5);
-    transform: translate(-50%, -100%); pointer-events: none; }
-  #miniNeedle { position: absolute; top: -3px; width: 4px; height: 20px; background: #fff;
+    transform: translate(0, -50%); pointer-events: none; }
+  #miniNeedle { position: absolute; left: -3px; width: 20px; height: 4px; background: #fff;
     border-radius: 2px; box-shadow: 0 0 3px #000; }
   #miniGauge.danger { border-color: #f33; animation: blink .4s infinite; }
 
@@ -65,6 +105,9 @@
   .overlay h1 { font-size: 34px; margin: 0 0 16px; }
   .overlay p { font-size: 16px; line-height: 1.9; margin: 4px 0; }
   .overlay .big { font-size: 44px; font-weight: bold; color: #fc0; }
+  #goalNewRecord { font-size: 26px; font-weight: bold; color: #fc0; margin: 10px 0 4px;
+                   text-shadow: 0 0 10px rgba(255,204,0,.8); animation: blink .6s infinite; }
+  #goalBest { opacity: .85; }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -86,10 +129,13 @@
   <div id="miniGauge" class="hidden"><div id="miniNeedle"></div></div>
   <div id="shotPanel" class="ready">
     <div id="shotIcon">💉</div>
+    <div id="shotTitle">マンジャロ</div>
     <div id="shotState">スペースで注射</div>
+    <div id="shotBarWrap"><div id="shotBar"></div></div>
   </div>
   <div id="dangerVignette"></div>
   <div id="zoneVignette"></div>
+  <div id="shotVignette"></div>
 </div>
 
 <div id="startOverlay" class="overlay">
@@ -97,6 +143,7 @@
   <p>←→ / A・D:レーン移動  スペース:注射  Z:ゾーン発動  R:リトライ</p>
   <p>速度はゴールに近づくほど勝手に上がっていく。振り落とされるな。</p>
   <p id="ruleHyper"></p>
+  <p id="ruleShot"></p>
   <p id="ruleZone"></p>
   <p style="margin-top:20px; font-weight:bold;">クリックまたは Enter でスタート</p>
 </div>
@@ -110,6 +157,8 @@
 <div id="goalOverlay" class="overlay hidden">
   <h1>GOAL!</h1>
   <div class="big" id="goalTime">0.00 秒</div>
+  <div id="goalNewRecord" class="hidden">🏆 ハイスコア更新!</div>
+  <p id="goalBest"></p>
   <p id="goalStats"></p>
   <p style="margin-top:16px;">R キーでリトライ(さっきより速く!)</p>
 </div>
@@ -122,43 +171,45 @@
    CONFIG — 調整する数値は全部ここ(プロト指示書のたたき台)
    ================================================================ */
 const CONFIG = {
-  drainPerSec       : 10,     // 血糖の毎秒自然減少・通常時(8→10)
-  drainPerSecHigh   : 15,     // 血糖の毎秒自然減少・高血糖時(安定域より上にいる間はこちら。急降下)
-  stableMin         : 40,     // 安定域 下限
-  stableMax         : 60,     // 安定域 上限
-  hyperThreshold    : 60,     // この血糖を超えると高血糖カウントダウン開始(80→60 安定域を出たら即危険)
-  hyperGraceSec     : 3,      // 猶予(秒)。時間内に hyperResetBelow まで下げないとゲームオーバー
-  hyperResetBelow   : 60,     // カウントダウン解除ライン(安定域に戻ればセーフ)
-  foodGain          : 18,     // 食べ物1つの血糖上昇(まばら化に合わせ増量。2個連続で高血糖圏)
+  drainPerSec       : 7,      // 血糖の毎秒自然減少・通常時(10→7 foodGainと同率で減。必要ペース1.8秒/個→1.71秒/個でほぼ維持)
+  drainPerSecHigh   : 25,     // 高血糖時の急降下(15→25 100から安全圏まで2.67秒→1.4秒。食べるのを止めれば助かる)
+  stableMin         : 35,     // 安定域 下限(40→35)
+  stableMax         : 65,     // 安定域 上限(60→65)
+  hyperThreshold    : 65,     // この血糖を超えると高血糖カウントダウン開始(安定域を出たら即危険)
+  hyperGraceSec     : 3,      // 猶予(秒)。まだ死にすぎるならここを4に上げるのが一番安全
+  hyperResetBelow   : 65,     // カウントダウン解除ライン(安定域に戻ればセーフ)
+  foodGain          : 12,     // 食べ物1つの血糖上昇(18→12 1個なら安定域内に収まる。2個で危険域)
   foodBoostMult     : 1.4,    // 食べた瞬間の速度ブースト倍率
   foodBoostDuration : 1.5,    // 食べた瞬間ブーストの持続(秒)
-  shotDuration      : 7,      // 注射の効果持続(秒)
-  shotEffect        : 0.333,  // 注射中の摂取倍率(1/3)
+  shotClearSec      : 2.5,    // 注射:前方「走行速度×この秒数」の食べ物を全レーンまとめて消去
+                              //       距離固定だと序盤(速度50)と終盤(速度120)で効果が別物になるため時間で持つ
   shotCooldown      : 7,      // 注射クールタイム(秒)
   lockDuration      : 7,      // 女性接触時の注射ロック(秒)
-  zoneChargePerSec  : 8,      // ゾーン帯滞在中のゲージ蓄積(%/秒)(40→8 じっくり型。満タンに約12.5秒の帯滞在が必要)
-  zoneDecayPerSec   : 0,      // 帯を外れた時の減少(%/秒)(4→0 外れても減らない。貯金は消えない)
+  zoneChargePerSec  : 20,     // 緑帯 滞在中のゲージ蓄積(%/秒)(8→20 満タンまで12.5秒→5秒。回数上限なし)
+  zoneDecayPerSec   : 0,      // 帯を外れた時の減少(%/秒)。0=貯金は消えない
   zoneDuration      : 1.5,    // ゾーン発動時間(秒)
-  zoneSpeedMult     : 1.8,    // ゾーン中の速度倍率(その時点の走行速度に対する倍率。終盤なら実質5倍速級)
-  courseLengthSec   : 30,     // コース1本の想定プレイ時間(最高速換算)
+  zoneSpeedMult     : 1.8,    // ゾーン中の速度倍率(その時点の走行速度に対する倍率)
+  courseLengthSec   : 45,     // コース1本の想定プレイ時間(30→45)
 
   // ---- 以下はプロト実装用の追加定数 ----
-  baseSpeed         : 36,     // 序盤の基準速度(units/秒)(26→36 最初から速く)
-  rampEndMult       : 2.0,    // ゴール直前の速度倍率(2.8→2.0 終速は約72units/秒でほぼ据え置き)
-  rampCurve         : 1.0,    // 加速カーブ(1=序盤から終盤まで一定ペースで加速。1.3→1.0に変更)
-  zoneBandMin       : 42,     // ゾーンゲージが溜まる血糖の下限(45→42 帯を広く)
-  zoneBandMax       : 58,     // ゾーンゲージが溜まる血糖の上限(55→58 帯を広く)
+  baseSpeed         : 50,     // 序盤の基準速度(units/秒)(36→50)
+  rampEndMult       : 2.4,    // ゴール直前の速度倍率(2.0→2.4 終速は120units/秒)
+  rampCurve         : 1.0,    // 加速カーブ(1=序盤から終盤まで一定ペースで加速)
+  zoneBandMin       : 35,     // ゾーンが溜まる血糖の下限 = stableMin と一致(緑=ゾーン範囲に統一)
+  zoneBandMax       : 65,     // ゾーンが溜まる血糖の上限 = stableMax と一致
   laneWidth         : 4,      // レーン幅
-  laneChangeSpeed   : 14,     // レーン移動の速さ(units/秒)
-  dangerZone        : 15,     // 血糖がこの値未満/100-これ超で赤点滅
+  laneChangeSpeed   : 18,     // レーン移動の速さ(14→18 最高速120に操作の応答を追従させる)
+  dangerZone        : 15,     // 血糖がこの値未満で赤点滅
   collectDist       : 2.0,    // 食べ物・障害物の当たり判定(前後方向)
-  sparseGapMin      : 16,     // まばら区間の食べ物間隔・最小(大きいほどまばら)
-  sparseGapMax      : 26,     // まばら区間の食べ物間隔・最大
-  denseRowSpacing   : 9,      // 誘惑バースト(中盤)の列の間隔(小さいほど密)
-  denseAllLaneChance: 0.15,   // 誘惑バーストで全レーン埋まる列の確率
-  finalRowSpacing   : 20,     // 最終ガントレットの列の間隔(終盤は速度~2.6倍なので空間も広めに=体感は十分密)
-  finalAllLaneChance: 0.12,   // 最終ガントレットで全レーン埋まる列の確率(0.35→0.12 避ける余地を残す)
+  sparseGapMin      : 32,     // まばら区間の食べ物間隔・最小(16→32 まばら化)
+  sparseGapMax      : 52,     // まばら区間の食べ物間隔・最大(26→52 まばら化)
+  denseRowSpacing   : 30,     // 誘惑バースト(中盤)の列の間隔(9→30 避けられないほど詰まっていたので大幅解体)
+  denseAllLaneChance: 0,      // 誘惑バーストで全レーン埋まる列の確率(0.15→0 全レーン封鎖は廃止)
+  finalRowSpacing   : 40,     // 最終ガントレットの列の間隔(20→40 速度1.67倍を加味すると実質半減)
+  finalAllLaneChance: 0.08,   // 最終ガントレットで全レーン埋まる列の確率(0.12→0.08)
   denseWeaveChance  : 0.7,    // 密集区間で空きレーンが隣に移動する確率(高いほど左右に振られる)
+  womanRevealSec    : 0.6,    // 女性が地面から現れる距離を「走行速度×この秒数」で決める(これも距離固定だと速度で難度が変わる)
+  womanRiseSec      : 0.15,   // 地面からせり上がりきるまでの時間(秒)
   seed              : 12345,  // コース生成シード(同じ数字なら毎回同じコース=タイムアタック用)
 };
 
@@ -319,7 +370,10 @@ const foodGeo = new THREE.SphereGeometry(0.8, 12, 10);
 const womanMatBody = new THREE.MeshLambertMaterial({ color: 0xdd2255 });
 
 let foodMeshes = [];  // {mesh, lane, z, eaten}
-let womanMeshes = []; // {mesh, lane, z, hit}
+let womanMeshes = []; // {mesh, lane, z, hit, revealT}
+
+const WOMAN_HIDE_Y = -3.2;   // 女性キャラの隠し位置(地面より下。ここから0まで上がってくる)
+const MINI_GAUGE_SIDE = 2.4; // ミニ血糖バーを主人公の何units右に置くか(大きいほど体から離れる)
 
 // カメラが+z方向を向くため画面上はx軸が左右反転して映る。ここで符号を反転させて
 // 「右キー(lane+1)=画面の右」に合わせる(食べ物配置・当たり判定も全てこの関数を通る)
@@ -346,9 +400,10 @@ function spawnCourse() {
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 10), new THREE.MeshLambertMaterial({ color: 0xf0c090 }));
     head.position.y = 2.35;
     g.add(head);
-    g.position.set(laneToX(w.lane), 0, w.z);
+    // 地面の下に隠しておき、直前まで近づいたらせり上がる(revealT: 0=地中 1=完全に出た)
+    g.position.set(laneToX(w.lane), WOMAN_HIDE_Y, w.z);
     scene.add(g);
-    womanMeshes.push({ mesh: g, lane: w.lane, z: w.z, hit: false });
+    womanMeshes.push({ mesh: g, lane: w.lane, z: w.z, hit: false, revealT: 0 });
   }
 }
 
@@ -363,8 +418,8 @@ function resetGame() {
   S.lane = 1;            // 0=左 1=中 2=右
   S.x = 0;
   S.elapsed = 0;
-  S.shotActive = 0;      // 注射効果 残り秒
   S.shotCooldown = 0;    // クールタイム 残り秒
+  S.shotFlash = 0;       // 注射を撃った手応えの表示 残り秒
   S.lock = 0;            // 注射ロック 残り秒
   S.zoneGauge = 0;       // 0〜100
   S.zoneActive = 0;      // ゾーン 残り秒
@@ -372,6 +427,8 @@ function resetGame() {
   S.zoneReady = false;   // ゾーン満タン(Zキー発動待ち)
   S.hyperTimer = 0;      // 高血糖カウントダウン 残り秒(0=非発動)
   S.shotCount = 0;
+  S.clearedCount = 0;    // 注射で消した食べ物の総数
+  S.lastCleared = 0;     // 直近1回で消した数
   S.zoneTotal = 0;
   S.robbedCount = 0;     // 奪われ(ロック)回数
   spawnCourse();
@@ -419,12 +476,26 @@ addEventListener("keydown", (e) => {
   }
 });
 
+// 注射(マンジャロ)= 目の前の食べ物をまとめて消す。効果は一瞬で、持続しない。
+// 「食べたいのに食べられない」ではなく「誘惑そのものが消える」形にした(薬の作用に近い)。
+// 代償は血糖が上がらないこと=そのまま低血糖に近づくこと。
 function tryShot() {
   if (S.state !== "running") return;
   if (S.lock > 0 || S.shotCooldown > 0) return; // 不発
-  S.shotActive = CONFIG.shotDuration;
   S.shotCooldown = CONFIG.shotCooldown;
   S.shotCount++;
+
+  const range = CONFIG.baseSpeed * rampMult() * CONFIG.shotClearSec;
+  let cleared = 0;
+  for (const f of foodMeshes) {
+    if (f.eaten || f.z < S.z || f.z - S.z > range) continue;
+    f.eaten = true;
+    f.mesh.visible = false;
+    cleared++;
+  }
+  S.clearedCount += cleared;
+  S.lastCleared = cleared;  // 直近1回で何個消えたか(パネルの表示用)
+  S.shotFlash = 0.35;
 }
 
 /* ================================================================
@@ -440,6 +511,8 @@ const zoneBar = document.getElementById("zoneBar");
 const timePanel = document.getElementById("timePanel");
 const shotPanel = document.getElementById("shotPanel");
 const shotState = document.getElementById("shotState");
+const shotBar = document.getElementById("shotBar");
+const shotVignette = document.getElementById("shotVignette");
 const dangerVignette = document.getElementById("dangerVignette");
 const zoneVignette = document.getElementById("zoneVignette");
 const hyperWarn = document.getElementById("hyperWarn");
@@ -447,26 +520,27 @@ const miniGauge = document.getElementById("miniGauge");
 const miniNeedle = document.getElementById("miniNeedle");
 
 // 3色ゾーンの帯をCONFIGから生成(赤=危険域 / 黄=中間 / 緑=安定域)
+// 緑は1色だけ。「緑にいる = ゾーンが溜まる」を見た目とルールで完全に一致させている
+// (以前は安定域とゾーン帯が別範囲で緑が2段階あり、どこで溜まるのか読めなかった)
 {
   const d = CONFIG.dangerZone, sMin = CONFIG.stableMin, sMax = CONFIG.stableMax;
-  const zMin = CONFIG.zoneBandMin, zMax = CONFIG.zoneBandMax;
-  // ゾーン帯(zoneBand)は安定域の中でも明るい緑。安定域の上は即カウントダウン圏なので全部赤
-  glucoseBarWrap.style.background =
-    `linear-gradient(to right,
-      #d33 0%, #d33 ${d}%,
-      #dc3 ${d}%, #dc3 ${sMin}%,
-      #3c6 ${sMin}%, #3c6 ${zMin}%,
-      #4f9 ${zMin}%, #4f9 ${zMax}%,
-      #3c6 ${zMax}%, #3c6 ${sMax}%,
-      #d33 ${sMax}%, #d33 100%)`;
-  miniGauge.style.background = glucoseBarWrap.style.background; // 頭上バーも同じ色分け
+  // 安定域の上は即カウントダウン圏なので、黄色を挟まず全部赤
+  const stops =
+    `#d33 0%, #d33 ${d}%,
+     #dc3 ${d}%, #dc3 ${sMin}%,
+     #4f9 ${sMin}%, #4f9 ${sMax}%,
+     #d33 ${sMax}%, #d33 100%`;
+  glucoseBarWrap.style.background = `linear-gradient(to right, ${stops})`;
+  miniGauge.style.background     = `linear-gradient(to top, ${stops})`; // 横のバーは縦向きなので下から上へ
 }
 
 // スタート画面のルール説明もCONFIGから生成(数値を振ったときに説明文が置き去りにならないように)
 document.getElementById("ruleHyper").textContent =
   `血糖値 ${CONFIG.hyperThreshold} 超で高血糖カウントダウン(${CONFIG.hyperGraceSec}秒以内に ${CONFIG.hyperResetBelow} 以下へ)、0 で低血糖。どちらも倒れる。`;
+document.getElementById("ruleShot").textContent =
+  `スペース=注射。目の前の食べ物がまとめて消える(クールタイム ${CONFIG.shotCooldown}秒)。ただし食べられない分、血糖は落ち続ける。`;
 document.getElementById("ruleZone").textContent =
-  `血糖 ${CONFIG.zoneBandMin}〜${CONFIG.zoneBandMax}(明るい緑)キープでゾーンが溜まる。満タン後 Z キーで無敵の超加速——終盤の食べ物地獄はゾーンで抜けろ。`;
+  `ゲージの緑(${CONFIG.zoneBandMin}〜${CONFIG.zoneBandMax})をキープするとゾーンが溜まる。満タン後 Z キーで無敵の超加速。回数制限なし——安定を保つほど速く走れる。`;
 
 /* ================================================================
    メインループ
@@ -490,8 +564,8 @@ function update(dt) {
 
   // タイマー類
   S.elapsed += dt;
-  S.shotActive = Math.max(0, S.shotActive - dt);
   S.shotCooldown = Math.max(0, S.shotCooldown - dt);
+  S.shotFlash = Math.max(0, S.shotFlash - dt);
   S.lock = Math.max(0, S.lock - dt);
   S.foodBoost = Math.max(0, S.foodBoost - dt);
 
@@ -518,6 +592,15 @@ function update(dt) {
     S.z += runSpeed * boostMult * dt;
   }
 
+  // 女性キャラのせり上がり:一定の「時間」手前まで近づいたら地面から出てくる。
+  // 出現距離を固定にすると、速度50の序盤と速度120の終盤で反応時間が2倍以上変わって
+  // 終盤が運ゲーになるため、距離ではなく時間(走行速度×womanRevealSec)で持つ。
+  const revealDist = runSpeed * CONFIG.womanRevealSec;
+  for (const w of womanMeshes) {
+    if (w.revealT >= 1) continue;
+    if (w.z - S.z <= revealDist) w.revealT = Math.min(1, w.revealT + dt / CONFIG.womanRiseSec);
+  }
+
   // レーン移動(スムーズに)
   const targetX = laneToX(S.lane);
   const dx = targetX - S.x;
@@ -530,8 +613,7 @@ function update(dt) {
     if (Math.abs(f.z - S.z) < CONFIG.collectDist && Math.abs(laneToX(f.lane) - S.x) < CONFIG.laneWidth * 0.45) {
       f.eaten = true;
       f.mesh.visible = false;
-      const gain = CONFIG.foodGain * (S.shotActive > 0 ? CONFIG.shotEffect : 1);
-      S.glucose += gain;
+      S.glucose += CONFIG.foodGain;
       S.foodBoost = CONFIG.foodBoostDuration; // 食べた瞬間ブースト(重ねず上書きリフレッシュ)
     }
   }
@@ -540,10 +622,10 @@ function update(dt) {
   for (const w of womanMeshes) {
     if (w.hit || S.zoneActive > 0) continue;
     if (Math.abs(w.z - S.z) < CONFIG.collectDist && Math.abs(laneToX(w.lane) - S.x) < CONFIG.laneWidth * 0.45) {
+      // 奪われるのは「次の1本」だけ。すでに撃った注射の効果(消えた食べ物)は取り消されない
       w.hit = true;
       S.lock = CONFIG.lockDuration;
       S.robbedCount++;
-      S.shotActive = 0; // 効果中だった場合も打ち消す(仮ルール)
       w.mesh.children.forEach(c => { if (c.material) c.material.color.set(0x884466); });
     }
   }
@@ -577,11 +659,44 @@ function gameOver(type, reason) {
   show(overOverlay);
 }
 
+/* ---- ハイスコア(localStorage) ----
+   注意: file:// で直接開いた場合と Pages の URL では保存先が別扱いになる。
+   チームでタイムを比べるなら全員が同じ URL で遊ぶこと。 */
+const HS_KEY = "manjaro_proto_best_sec";
+
+function loadBest() {
+  try {
+    const v = parseFloat(localStorage.getItem(HS_KEY));
+    return isFinite(v) && v > 0 ? v : null;
+  } catch (e) { return null; } // プライベートモード等で localStorage が使えなくても落とさない
+}
+function saveBest(sec) {
+  try { localStorage.setItem(HS_KEY, sec.toFixed(2)); } catch (e) {}
+}
+
 function goal() {
   S.state = "goal";
-  document.getElementById("goalTime").textContent = S.elapsed.toFixed(2) + " 秒";
+  const time = S.elapsed;
+  const prev = loadBest();
+  const isNew = prev === null || time < prev;
+  if (isNew) saveBest(time);
+
+  document.getElementById("goalTime").textContent = time.toFixed(2) + " 秒";
+
+  const newRecordEl = document.getElementById("goalNewRecord");
+  const bestEl = document.getElementById("goalBest");
+  if (isNew) {
+    newRecordEl.classList.remove("hidden");
+    bestEl.textContent = prev === null
+      ? "初記録!"
+      : `これまでのベスト ${prev.toFixed(2)} 秒 → ${(prev - time).toFixed(2)} 秒 短縮`;
+  } else {
+    newRecordEl.classList.add("hidden");
+    bestEl.textContent = `ベスト ${prev.toFixed(2)} 秒(あと ${(time - prev).toFixed(2)} 秒)`;
+  }
+
   document.getElementById("goalStats").textContent =
-    `注射 ${S.shotCount} 回 / 奪われ ${S.robbedCount} 回 / ゾーン合計 ${S.zoneTotal.toFixed(1)} 秒`;
+    `注射 ${S.shotCount} 回(食べ物 ${S.clearedCount} 個を消去) / 奪われ ${S.robbedCount} 回 / ゾーン合計 ${S.zoneTotal.toFixed(1)} 秒`;
   show(goalOverlay);
 }
 
@@ -603,26 +718,36 @@ function updateHUD() {
     zoneLabel.textContent = "ゾーン準備完了! Zキーで発動!!";
   } else {
     zonePanel.classList.remove("active");
-    zoneLabel.textContent = `ゾーンゲージ(${CONFIG.zoneBandMin}〜${CONFIG.zoneBandMax}キープで蓄積)`;
+    zoneLabel.textContent = `ゾーンゲージ(緑=${CONFIG.zoneBandMin}〜${CONFIG.zoneBandMax}キープで蓄積)`;
   }
 
   timePanel.textContent = S.state === "running" ? S.elapsed.toFixed(2) : timePanel.textContent;
 
+  // ゲージは常に「満タン = 使える」で統一する(奪われ中も補充中も、溜まりきったら撃てる)
   shotPanel.className = "";
+  // 撃った直後に女性に当たった場合は「奪われた」を優先する(緊急度が高いため)。
+  // 画面フチの水色フラッシュは firing に紐づくので、消去の手応え自体は残る。
+  const firing = S.shotFlash > 0;
   if (S.lock > 0) {
     shotPanel.classList.add("locked");
-    shotState.textContent = `ロック中 あと ${S.lock.toFixed(1)} 秒`;
+    shotState.textContent = `奪われた!\n取り返すまで ${S.lock.toFixed(1)} 秒`;
+    shotBar.style.width = ((1 - S.lock / CONFIG.lockDuration) * 100) + "%";
+  } else if (firing) {
+    shotPanel.classList.add("firing");
+    shotState.textContent = S.lastCleared > 0
+      ? `食べ物 ${S.lastCleared} 個を消した!`
+      : "前方に食べ物なし";
+    shotBar.style.width = "100%";
   } else if (S.shotCooldown > 0) {
     shotPanel.classList.add("cooldown");
-    shotState.textContent = `クールタイム あと ${S.shotCooldown.toFixed(1)} 秒`;
+    shotState.textContent = `補充中\nあと ${S.shotCooldown.toFixed(1)} 秒`;
+    shotBar.style.width = ((1 - S.shotCooldown / CONFIG.shotCooldown) * 100) + "%";
   } else {
     shotPanel.classList.add("ready");
-    shotState.textContent = "スペースで注射";
+    shotState.textContent = "スペースで注射\n前方の食べ物を消す";
+    shotBar.style.width = "100%";
   }
-  if (S.shotActive > 0) {
-    shotPanel.classList.add("active");
-    shotState.textContent += `\n効果中 ${S.shotActive.toFixed(1)} 秒`;
-  }
+  shotVignette.className = firing ? "on" : "";
 
   dangerVignette.className = (S.state === "running" && (g < CONFIG.dangerZone || S.hyperTimer > 0)) ? "on" : "";
 
@@ -654,15 +779,16 @@ function render() {
   camera.fov += (targetFov - camera.fov) * 0.1; // なめらかに追従
   camera.updateProjectionMatrix();
 
-  // 頭上ミニ血糖バー:主人公の頭上のワールド座標をスクリーン座標に投影して追従させる
+  // 横のミニ血糖バー:主人公の右隣のワールド座標をスクリーン座標に投影して追従させる。
+  // laneToX が符号を反転しているとおり、画面の右はワールドの -x 側。
   if (S.state === "running") {
     miniGauge.classList.remove("hidden");
-    const headPos = new THREE.Vector3(S.x, 3.9, S.z);
-    headPos.project(camera);
-    miniGauge.style.left = ((headPos.x * 0.5 + 0.5) * innerWidth) + "px";
-    miniGauge.style.top = ((-headPos.y * 0.5 + 0.5) * innerHeight) + "px";
+    const sidePos = new THREE.Vector3(S.x - MINI_GAUGE_SIDE, 1.6, S.z);
+    sidePos.project(camera);
+    miniGauge.style.left = ((sidePos.x * 0.5 + 0.5) * innerWidth) + "px";
+    miniGauge.style.top = ((-sidePos.y * 0.5 + 0.5) * innerHeight) + "px";
     const g = Math.max(0, Math.min(100, S.glucose));
-    miniNeedle.style.left = `calc(${g}% - 2px)`;
+    miniNeedle.style.bottom = `calc(${g}% - 2px)`;
     miniGauge.classList.toggle("danger", S.hyperTimer > 0 || g < CONFIG.dangerZone);
   } else {
     miniGauge.classList.add("hidden");
@@ -671,6 +797,12 @@ function render() {
   // 食べ物をぷかぷか回す
   for (const f of foodMeshes) {
     if (!f.eaten) f.mesh.rotation.y += 0.02;
+  }
+
+  // 女性キャラを地面から突き上げる(最後に減速するイージングで「ズドン」と出る感じにする)
+  for (const w of womanMeshes) {
+    const e = 1 - Math.pow(1 - w.revealT, 3);
+    w.mesh.position.y = WOMAN_HIDE_Y * (1 - e);
   }
   renderer.render(scene, camera);
 }
@@ -688,8 +820,9 @@ function loop(now) {
 
 // 開始前も背景だけ描画しておく
 S.state = "ready"; S.x = 0; S.z = 0; S.glucose = 50; S.elapsed = 0;
-S.zoneGauge = 0; S.zoneActive = 0; S.shotActive = 0; S.shotCooldown = 0; S.lock = 0;
-S.foodBoost = 0; S.robbedCount = 0; S.shotCount = 0; S.zoneTotal = 0; S.hyperTimer = 0; S.zoneReady = false;
+S.zoneGauge = 0; S.zoneActive = 0; S.shotFlash = 0; S.shotCooldown = 0; S.lock = 0;
+S.foodBoost = 0; S.robbedCount = 0; S.shotCount = 0; S.clearedCount = 0; S.lastCleared = 0;
+S.zoneTotal = 0; S.hyperTimer = 0; S.zoneReady = false;
 spawnCourse();
 render();
 requestAnimationFrame(loop);
