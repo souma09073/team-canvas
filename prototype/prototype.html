@@ -213,8 +213,8 @@ const CONFIG = {
   hyperGraceSec     : 3,      // 猶予(秒)。まだ死にすぎるならここを4に上げるのが一番安全
   hyperResetBelow   : 65,     // カウントダウン解除ライン(安定域に戻ればセーフ)
   foodGain          : 20,     // 食べ物1つの血糖上昇(12→20 取ったことがハッキリ分かる跳ね方に)
-  foodBoostMult     : 2.2,    // 食べた瞬間の速度ブースト倍率(1.4→2.2 取る価値を大きくする)
-  foodBoostDuration : 0.35,   // 食べた瞬間ブーストの持続(秒)(1.5→0.35 一瞬だけドンと出る)
+  // 食べた瞬間の速度ブーストは廃止した(加速するとコントロールを失うため)。
+  // 「取れた」感は速度ではなく演出だけで出す(FOOD_POP_SEC まわり)。
   shotClearSec      : 2.5,    // 注射:前方「走行速度×この秒数」の食べ物を全レーンまとめて消去
                               //       距離固定だと序盤(速度50)と終盤(速度120)で効果が別物になるため時間で持つ
   shotCooldown      : 7,      // 注射クールタイム(秒)
@@ -491,7 +491,6 @@ function resetGame() {
   S.lock = 0;            // 注射ロック 残り秒
   S.zoneGauge = 0;       // 0〜100
   S.zoneActive = 0;      // ゾーン 残り秒
-  S.foodBoost = 0;       // 食べた瞬間ブースト 残り秒
   S.foodPop = 0;         // 食べた演出 残り秒
   S.zoneReady = false;   // ゾーン満タン(Zキー発動待ち)
   S.hyperTimer = 0;      // 高血糖カウントダウン 残り秒(0=非発動)
@@ -638,7 +637,6 @@ function update(dt) {
   S.shotCooldown = Math.max(0, S.shotCooldown - dt);
   S.shotFlash = Math.max(0, S.shotFlash - dt);
   S.lock = Math.max(0, S.lock - dt);
-  S.foodBoost = Math.max(0, S.foodBoost - dt);
   S.foodPop = Math.max(0, S.foodPop - dt);
 
   // ゾーンゲージ
@@ -655,14 +653,10 @@ function update(dt) {
     if (S.zoneGauge >= 100) S.zoneReady = true; // 貯金完了。いつ切るかは自分で決める
   }
 
-  // 移動:進行度で勝手に加速し続ける。ゾーン中はさらに倍率をかけて疾走(無敵タイム)
+  // 移動:進行度で勝手に加速し続ける。速度を変える要素はゾーンだけ
+  // (食べた瞬間のブーストは、加速でコントロールを失うため廃止した)
   const runSpeed = CONFIG.baseSpeed * rampMult();
-  if (S.zoneActive > 0) {
-    S.z += runSpeed * CONFIG.zoneSpeedMult * dt;
-  } else {
-    const boostMult = S.foodBoost > 0 ? CONFIG.foodBoostMult : 1;
-    S.z += runSpeed * boostMult * dt;
-  }
+  S.z += runSpeed * (S.zoneActive > 0 ? CONFIG.zoneSpeedMult : 1) * dt;
 
   // 女性キャラのせり上がり:一定の「時間」手前まで近づいたら地面から出てくる。
   // 出現距離を固定にすると、速度50の序盤と速度120の終盤で反応時間が2倍以上変わって
@@ -686,8 +680,7 @@ function update(dt) {
       f.eaten = true;
       f.mesh.visible = false;
       S.glucose += CONFIG.foodGain;
-      S.foodBoost = CONFIG.foodBoostDuration; // 食べた瞬間ブースト(重ねず上書きリフレッシュ)
-      S.foodPop = FOOD_POP_SEC;               // 「+20」の飛び出しと画面フチの発光をリセット
+      S.foodPop = FOOD_POP_SEC;   // 「+20」の飛び出しと画面フチの発光をリセット(速度は変えない)
     }
   }
 
@@ -779,10 +772,8 @@ function updateHUD() {
   const g = Math.max(0, Math.min(100, S.glucose));
   glucoseNeedle.style.left = `calc(${g}% - 2px)`;
   glucoseNum.textContent = Math.round(g);
-  const pct = Math.round(rampMult()
-    * (S.zoneActive > 0 ? CONFIG.zoneSpeedMult : (S.foodBoost > 0 ? CONFIG.foodBoostMult : 1)) * 100);
-  speedNum.textContent = `速度 ${pct}%`
-    + (S.zoneActive > 0 ? " 🌟ゾーン!!" : (S.foodBoost > 0 ? " ⚡⚡ 加速!!" : ""));
+  const pct = Math.round(rampMult() * (S.zoneActive > 0 ? CONFIG.zoneSpeedMult : 1) * 100);
+  speedNum.textContent = `速度 ${pct}%` + (S.zoneActive > 0 ? " 🌟ゾーン!!" : "");
 
   // 食べた瞬間、血糖の数字を跳ねさせる(数字がどこで動いたのか気付かせる)
   const popT = S.foodPop / FOOD_POP_SEC;   // 1 → 0
@@ -920,7 +911,7 @@ function loop(now) {
 // 開始前も背景だけ描画しておく
 S.state = "ready"; S.x = 0; S.z = 0; S.glucose = 50; S.elapsed = 0;
 S.zoneGauge = 0; S.zoneActive = 0; S.shotFlash = 0; S.shotCooldown = 0; S.lock = 0;
-S.foodBoost = 0; S.foodPop = 0; S.robbedCount = 0; S.shotCount = 0; S.clearedCount = 0; S.lastCleared = 0;
+S.foodPop = 0; S.robbedCount = 0; S.shotCount = 0; S.clearedCount = 0; S.lastCleared = 0;
 S.zoneTotal = 0; S.hyperTimer = 0; S.zoneReady = false;
 spawnCourse();
 render();
