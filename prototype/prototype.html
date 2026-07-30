@@ -116,6 +116,10 @@
     font-size: 30px; font-weight: bold; color: #f33; text-shadow: 0 0 8px #000;
     background: rgba(0,0,0,.6); border: 3px solid #f33; border-radius: 12px; padding: 8px 20px;
     animation: blink .4s infinite; white-space: nowrap; }
+  #finalWarn { position: absolute; top: 145px; left: 50%; transform: translateX(-50%);
+    font-size: 17px; font-weight: bold; color: #201800; text-align: center;
+    background: rgba(255,215,40,.92); border: 2px solid #fff3a0; border-radius: 10px;
+    padding: 7px 16px; box-shadow: 0 0 18px rgba(255,210,0,.55); white-space: nowrap; }
 
   /* 危険点滅・ゾーン発動の画面演出 */
   /* 危険の画面フチ。高血糖=赤 / 低血糖=青 で完全に分ける。
@@ -172,6 +176,7 @@
   <div id="timePanel">0.00</div>
   <div id="timeSub"></div>
   <div id="hyperWarn" class="hidden">⚠ 高血糖! あと 3.0 秒</div>
+  <div id="finalWarn" class="hidden">終盤: Zで女性をすり抜け → マンジャロを温存</div>
   <div id="miniGauge" class="hidden"><div id="miniNeedle"></div></div>
   <div id="shotPanel" class="ready">
     <div id="shotIcon">💉</div>
@@ -265,7 +270,7 @@ const CONFIG = {
   zoneSpeedMult     : 1.8,    // ゾーン中の速度倍率(その時点の走行速度に対する倍率)
                               //   ゾーンの効果は「加速」と「女性すり抜け」だけ。
                               //   食べ物はすり抜けず、血糖も普通に動く(マンジャロと役割を分けるため)
-  courseLengthSec   : 70,     // コース1本の想定プレイ時間(45→70 大幅延長)
+  courseLengthSec   : 55,     // コース1本の想定プレイ時間(70→55 間延びしていた中盤以降を圧縮)
 
   // ---- 以下はプロト実装用の追加定数 ----
   baseSpeed         : 70,     // 序盤の基準速度(units/秒)(50→70)
@@ -291,9 +296,11 @@ const CONFIG = {
                               //   (1レーンだけ延々ガラ空きになるのを防ぐ)
   denseWomanChance  : 0.15,   // 【中盤のみ】空きレーンに女性を置く確率(新規)
                               //   食べ物2個 + 空きレーンに女性 = 「食べる/ぶつかる/事前に消す」の三択になる
-  finalWallAt       : 0.90,   // 【終盤のみ】3個並びの壁を置く位置(コース長に対する割合)(新規)
+  finalWallAt       : 0.80,   // 【終盤のみ】3個並びの壁を置く位置(コース長に対する割合)
   finalWallRows     : 4,      // 壁を何列連続させるか(新規)
                               //   4列×65units=260units。マンジャロ1発の消去範囲(終盤で約458units)に収まる幅にしてある
+  finalWomanRows    : 3,      // 壁の直前に置く「食べ物2個+空きレーンの女性」の列数
+  finalWarnSec      : 5,      // 終盤チャレンジの操作ヒントを何秒手前から出すか
   wallSignLeadSec   : 8,      // 壁の何秒手前に警告看板を立てるか(新規)
                               //   看板自体は約300units手前(カメラの描画限界)から見えるので、
                               //   実際に気付けるのは「この秒数 + 約1.6秒」前になる。
@@ -339,8 +346,9 @@ const DENSE_ZONES = [
   // 中盤:誘惑バースト。空きレーンに女性を置いて「食べる / ぶつかる / 事前に消す」の三択を作る
   { from: 0.40, to: 0.47, rowSpacing: CONFIG.denseRowSpacing,
     womanChance: CONFIG.denseWomanChance, hasWall: false },
-  // 終盤:最終ガントレット。マンジャロで消さないと抜けられない壁を1ヶ所だけ置く
-  { from: 0.84, to: 0.96, rowSpacing: CONFIG.finalRowSpacing,
+  // 終盤:中盤後の休憩を短くし、最終ガントレットを早めに始める。
+  // マンジャロで消さないと抜けられない壁を1ヶ所だけ置く
+  { from: 0.72, to: 0.96, rowSpacing: CONFIG.finalRowSpacing,
     womanChance: 0, hasWall: true },
 ];
 
@@ -353,6 +361,7 @@ function buildLayout() {
   const women = [];   // {z, lane}
 
   const walls = [];   // {start, end} 壁クラスタの範囲。警告表示に使う
+  let finalChallenge = null; // {start, wallStart, end} ゾーン→マンジャロを使う終盤区間
   const denseZones = DENSE_ZONES.map(d => ({
     start: COURSE_LENGTH * d.from,
     end:   COURSE_LENGTH * d.to,
@@ -393,6 +402,12 @@ function buildLayout() {
       if (wallFrom < 0) wallFrom = 0;
       wallTo = Math.min(rowZs.length - 1, wallFrom + CONFIG.finalWallRows - 1);
       walls.push({ start: rowZs[wallFrom], end: rowZs[wallTo] });
+      const womanFrom = Math.max(0, wallFrom - CONFIG.finalWomanRows);
+      finalChallenge = {
+        start: rowZs[womanFrom],
+        wallStart: rowZs[wallFrom],
+        end: rowZs[wallTo],
+      };
     }
 
     let openLane = Math.floor(rng() * 3);
@@ -417,9 +432,11 @@ function buildLayout() {
         if (isWall || lane !== openLane) foods.push({ z: rowZ, lane });
       }
 
-      // 空きレーンに女性を置く列(中盤のみ)。壁の列には置かない。
+      // 空きレーンに女性を置く列。終盤では壁の直前3列に必ず置く。
       // 食べ物2個 + 空きレーンに女性 = 「食べる / ぶつかる / 事前にマンジャロで消す」の三択。
-      if (!isWall && d.womanChance > 0 && rng() < d.womanChance) {
+      const isFinalWomanRow = d.hasWall
+        && i >= wallFrom - CONFIG.finalWomanRows && i < wallFrom;
+      if (isFinalWomanRow || (!isWall && d.womanChance > 0 && rng() < d.womanChance)) {
         women.push({ z: rowZ, lane: openLane });
       }
     }
@@ -431,7 +448,7 @@ function buildLayout() {
     }
   }
 
-  return { foods, women, walls };
+  return { foods, women, walls, finalChallenge };
 }
 
 /* ================================================================
@@ -537,6 +554,7 @@ const womanMatBody = new THREE.MeshLambertMaterial({ color: 0xdd2255 });
 let foodMeshes = [];  // {mesh, lane, z, eaten}
 let womanMeshes = []; // {mesh, lane, z, hit, revealT}
 let wallRanges = [];  // {start, end} 3個並びの壁の範囲
+let finalChallengeRange = null; // ゾーンで女性列を抜け、マンジャロを温存する終盤区間
 let signMeshes = [];  // 壁の手前に立てる警告看板(見た目だけ。当たり判定はない)
 
 // 壁の予告看板。本番はイラストの看板になる想定なので、ここでは箱で形だけ作る。
@@ -587,6 +605,7 @@ function spawnCourse() {
 
   const layout = buildLayout();
   wallRanges = layout.walls;
+  finalChallengeRange = layout.finalChallenge;
 
   // 壁の予告看板を道の両脇に立てる。「何秒手前か」で位置を決めるので、
   // 速度が変わっても気付くまでの時間は一定に保たれる。
@@ -741,6 +760,7 @@ const foodPopup = document.getElementById("foodPopup");
 const dangerVignette = document.getElementById("dangerVignette");
 const zoneVignette = document.getElementById("zoneVignette");
 const hyperWarn = document.getElementById("hyperWarn");
+const finalWarn = document.getElementById("finalWarn");
 const miniGauge = document.getElementById("miniGauge");
 const miniNeedle = document.getElementById("miniNeedle");
 
@@ -1037,6 +1057,22 @@ function updateHUD() {
     hyperWarn.textContent = `⚠ 高血糖! あと ${S.hyperTimer.toFixed(1)} 秒で ${CONFIG.hyperResetBelow} 以下に戻せ!`;
   } else {
     hyperWarn.classList.add("hidden");
+  }
+
+  // 壁の直前には「食べ物2個+女性」の列が続く。ゾーンで女性側を抜け、
+  // その後の壁に備えてマンジャロを温存する攻略を、初見でも判断できるよう予告する。
+  if (S.state === "running" && finalChallengeRange && S.z < finalChallengeRange.wallStart) {
+    const sec = (finalChallengeRange.start - S.z) / (CONFIG.baseSpeed * rampMult());
+    if (sec <= CONFIG.finalWarnSec) {
+      finalWarn.classList.remove("hidden");
+      finalWarn.textContent = sec > 0
+        ? `終盤まで ${Math.max(1, Math.ceil(sec))}秒　Zを準備・マンジャロを温存`
+        : "Zで女性をすり抜けろ!　マンジャロは次の壁へ温存";
+    } else {
+      finalWarn.classList.add("hidden");
+    }
+  } else {
+    finalWarn.classList.add("hidden");
   }
 
   zoneVignette.className = S.zoneActive > 0 ? "on" : "";
