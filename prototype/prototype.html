@@ -78,6 +78,15 @@
     opacity: 0; transition: opacity .3s; }
   #shotVignette.on { opacity: 1; transition: opacity .04s; }
 
+  /* 食べた瞬間の演出:画面フチのオレンジ + 主人公の上に飛び出す「+20」 */
+  #foodVignette { position: fixed; inset: 0; box-shadow: inset 0 0 120px 40px rgba(255,150,20,.6);
+    opacity: 0; }
+  #foodPopup { position: fixed; font-size: 40px; font-weight: bold; color: #ffb02e;
+    text-shadow: 0 0 6px #000, 0 3px 0 #7a3d00; transform: translate(-50%, -50%);
+    pointer-events: none; white-space: nowrap; }
+  /* 血糖値の数字も一緒に跳ねさせる(どこが変わったのか目線を誘導する) */
+  #glucoseNum { transition: none; transform-origin: left center; }
+
   /* 主人公の右横に追従するミニ血糖バー(縦向き:下=0 上=100) */
   #miniGauge { position: fixed; width: 14px; height: 150px; border-radius: 7px;
     border: 2px solid rgba(0,0,0,.65); box-shadow: 0 0 6px rgba(0,0,0,.5);
@@ -136,6 +145,8 @@
   <div id="dangerVignette"></div>
   <div id="zoneVignette"></div>
   <div id="shotVignette"></div>
+  <div id="foodVignette"></div>
+  <div id="foodPopup" class="hidden">+20</div>
 </div>
 
 <div id="startOverlay" class="overlay">
@@ -171,16 +182,39 @@
    CONFIG — 調整する数値は全部ここ(プロト指示書のたたき台)
    ================================================================ */
 const CONFIG = {
-  drainPerSec       : 7,      // 血糖の毎秒自然減少・通常時(10→7 foodGainと同率で減。必要ペース1.8秒/個→1.71秒/個でほぼ維持)
-  drainPerSecHigh   : 25,     // 高血糖時の急降下(15→25 100から安全圏まで2.67秒→1.4秒。食べるのを止めれば助かる)
+  // ▼▼ 血糖の振れ幅を調整したいときは、この4つだけ触れば足りる ▼▼
+  //
+  //  [1] foodGain / drainPerSec  … メーターの「跳ね」と「忙しさ」を決める
+  //        必要ペース = foodGain ÷ drainPerSec 秒に1個。今は 20÷14 = 1.43秒に1個。
+  //        ・両方を同じ倍率で上げる → 跳ねが大きくなる(忙しさは変わらない)
+  //        ・foodGain だけ上げる    → 食べる価値が上がり、高血糖に振り切りやすくなる
+  //        ・drainPerSec だけ上げる → 低血糖で死にやすくなる
+  //
+  //  [2] drainPerSecHigh … 高血糖から助かるまでの速さ。小さいほど高血糖で死にやすい
+  //        血糖100から安全圏(hyperResetBelow)まで = (100 - 65) ÷ drainPerSecHigh 秒。
+  //        今は 35÷15 = 2.33秒。これが hyperGraceSec(3秒)を超えると「振り切ったら確定死」になる。
+  //        もっと死なせたい → 12 まで下げる(2.9秒。ほぼ確定死になるので注意)
+  //        死にすぎる       → 20〜25 に戻す
+  //
+  //  [3] hyperGraceSec … 高血糖の猶予秒数。上げると一気に易しくなる安全弁
+  //
+  //  [4] stableMin / stableMax … 緑(=安定域=ゾーンが溜まる範囲)の幅
+  //        広げると易しく、狭めると難しくなる。hyperThreshold と hyperResetBelow も
+  //        stableMax に合わせて同じ数字にすること(3ヶ所セットで動かす)
+  //
+  //  変えたらブラウザを再読み込みするだけで反映される。
+  // ▲▲───────────────────────────────────────────────▲▲
+  drainPerSec       : 14,     // 血糖の毎秒自然減少・通常時(7→14 取らないとすぐ下がるように)
+  drainPerSecHigh   : 15,     // 高血糖時の下がり方(25→15 減少させて高血糖で倒れやすく)
+                              //   100→65 が 1.4秒→2.33秒。猶予3秒に対して余裕0.67秒しかない
   stableMin         : 35,     // 安定域 下限(40→35)
   stableMax         : 65,     // 安定域 上限(60→65)
   hyperThreshold    : 65,     // この血糖を超えると高血糖カウントダウン開始(安定域を出たら即危険)
   hyperGraceSec     : 3,      // 猶予(秒)。まだ死にすぎるならここを4に上げるのが一番安全
   hyperResetBelow   : 65,     // カウントダウン解除ライン(安定域に戻ればセーフ)
-  foodGain          : 12,     // 食べ物1つの血糖上昇(18→12 1個なら安定域内に収まる。2個で危険域)
-  foodBoostMult     : 1.4,    // 食べた瞬間の速度ブースト倍率
-  foodBoostDuration : 1.5,    // 食べた瞬間ブーストの持続(秒)
+  foodGain          : 20,     // 食べ物1つの血糖上昇(12→20 取ったことがハッキリ分かる跳ね方に)
+  foodBoostMult     : 2.2,    // 食べた瞬間の速度ブースト倍率(1.4→2.2 取る価値を大きくする)
+  foodBoostDuration : 0.35,   // 食べた瞬間ブーストの持続(秒)(1.5→0.35 一瞬だけドンと出る)
   shotClearSec      : 2.5,    // 注射:前方「走行速度×この秒数」の食べ物を全レーンまとめて消去
                               //       距離固定だと序盤(速度50)と終盤(速度120)で効果が別物になるため時間で持つ
   shotCooldown      : 7,      // 注射クールタイム(秒)
@@ -189,11 +223,11 @@ const CONFIG = {
   zoneDecayPerSec   : 0,      // 帯を外れた時の減少(%/秒)。0=貯金は消えない
   zoneDuration      : 1.5,    // ゾーン発動時間(秒)
   zoneSpeedMult     : 1.8,    // ゾーン中の速度倍率(その時点の走行速度に対する倍率)
-  courseLengthSec   : 45,     // コース1本の想定プレイ時間(30→45)
+  courseLengthSec   : 70,     // コース1本の想定プレイ時間(45→70 大幅延長)
 
   // ---- 以下はプロト実装用の追加定数 ----
-  baseSpeed         : 50,     // 序盤の基準速度(units/秒)(36→50)
-  rampEndMult       : 2.4,    // ゴール直前の速度倍率(2.0→2.4 終速は120units/秒)
+  baseSpeed         : 70,     // 序盤の基準速度(units/秒)(50→70)
+  rampEndMult       : 2.8,    // ゴール直前の速度倍率(2.4→2.8 終速は196units/秒)
   rampCurve         : 1.0,    // 加速カーブ(1=序盤から終盤まで一定ペースで加速)
   zoneBandMin       : 35,     // ゾーンが溜まる血糖の下限 = stableMin と一致(緑=ゾーン範囲に統一)
   zoneBandMax       : 65,     // ゾーンが溜まる血糖の上限 = stableMax と一致
@@ -201,14 +235,22 @@ const CONFIG = {
   laneChangeSpeed   : 18,     // レーン移動の速さ(14→18 最高速120に操作の応答を追従させる)
   dangerZone        : 15,     // 血糖がこの値未満で赤点滅
   collectDist       : 2.0,    // 食べ物・障害物の当たり判定(前後方向)
-  sparseGapMin      : 32,     // まばら区間の食べ物間隔・最小(16→32 まばら化)
-  sparseGapMax      : 52,     // まばら区間の食べ物間隔・最大(26→52 まばら化)
-  denseRowSpacing   : 30,     // 誘惑バースト(中盤)の列の間隔(9→30 避けられないほど詰まっていたので大幅解体)
-  denseAllLaneChance: 0,      // 誘惑バーストで全レーン埋まる列の確率(0.15→0 全レーン封鎖は廃止)
-  finalRowSpacing   : 40,     // 最終ガントレットの列の間隔(20→40 速度1.67倍を加味すると実質半減)
-  finalAllLaneChance: 0.08,   // 最終ガントレットで全レーン埋まる列の確率(0.12→0.08)
+  // ---- 食べ物の配置(1列は最大2個。3個並べて回避不能にすることはしない) ----
+  sparseGapMin      : 52,     // まばら区間の食べ物間隔・最小(32→52 速度が1.6倍になった分だけ広げた)
+  sparseGapMax      : 85,     // まばら区間の食べ物間隔・最大(52→85 同上)
+  denseRowSpacing   : 50,     // 誘惑バースト(中盤)の列の間隔(30→50)
+  finalRowSpacing   : 65,     // 最終ガントレットの列の間隔(40→65)
+                              //   レーン移動には 4÷18 = 0.22秒かかる。終盤の速度196では0.22秒=43units
+                              //   なので、これより狭いと空きレーンに追いつけず理不尽になる
   denseWeaveChance  : 0.7,    // 密集区間で空きレーンが隣に移動する確率(高いほど左右に振られる)
-  womanRevealSec    : 0.6,    // 女性が地面から現れる距離を「走行速度×この秒数」で決める(これも距離固定だと速度で難度が変わる)
+  denseMaxSameLane  : 2,      // 空きレーンが同じ位置に留まれる最大列数。超えたら強制的に動かす
+                              //   (1レーンだけ延々ガラ空きになるのを防ぐ)
+  courseStartClear  : 40,     // スタート直後、食べ物を置かない距離
+  courseEndClear    : 40,     // ゴール直前、食べ物を置かない距離
+  denseEdgeBuffer   : 10,     // 密集区間の前後に空ける距離(まばらの食べ物が混ざらないように)
+  womanLeadDist     : 18,     // 女性を密集区間の何units手前に置くか
+  // ---- 女性キャラの出現 ----
+  womanRevealSec    : 1.2,    // 地面から現れる距離を「走行速度×この秒数」で決める(0.6→1.2 急すぎたので倍に)
   womanRiseSec      : 0.15,   // 地面からせり上がりきるまでの時間(秒)
   seed              : 12345,  // コース生成シード(同じ数字なら毎回同じコース=タイムアタック用)
 };
@@ -228,42 +270,67 @@ function mulberry32(a) {
 // 加速するので、想定プレイ時間×平均速度でコース長を決める
 const COURSE_LENGTH = CONFIG.baseSpeed * CONFIG.courseLengthSec * (1 + CONFIG.rampEndMult) / 2;
 
-// レイアウト定義: まばら区間と密集区間(全レーンに食べ物、1レーンだけ空く)
+// 密集区間の位置。コース長に対する割合(0〜1)で指定する。
+// 行を足せば3ヶ所目・4ヶ所目が作れる。rowSpacing は小さいほど密。
+const DENSE_ZONES = [
+  { from: 0.40, to: 0.47, rowSpacing: CONFIG.denseRowSpacing },  // 中盤:誘惑バースト
+  { from: 0.84, to: 0.96, rowSpacing: CONFIG.finalRowSpacing },  // 終盤:最終ガントレット
+];
+
+// レイアウト定義: まばら区間と密集区間
+// 【原則】1列に置くのは最大2個。3個並べて回避不能な壁を作ることはしない。
 function buildLayout() {
   const rng = mulberry32(CONFIG.seed);
   const foods = [];   // {z, lane}
   const women = [];   // {z, lane}
 
-  // 密集区間はコース長に対する割合で指定。中盤=誘惑バースト、終盤=ゾーン前提の最終ガントレット
-  const denseZones = [
-    { start: COURSE_LENGTH * 0.40, end: COURSE_LENGTH * 0.47, allLane: CONFIG.denseAllLaneChance, rowSpacing: CONFIG.denseRowSpacing },
-    { start: COURSE_LENGTH * 0.84, end: COURSE_LENGTH * 0.96, allLane: CONFIG.finalAllLaneChance, rowSpacing: CONFIG.finalRowSpacing },
-  ];
+  const denseZones = DENSE_ZONES.map(d => ({
+    start: COURSE_LENGTH * d.from,
+    end:   COURSE_LENGTH * d.to,
+    rowSpacing: d.rowSpacing,
+  }));
 
-  // まばら区間: sparseGapMin〜Max間隔でランダムレーンに1個
-  let z = 40;
-  while (z < COURSE_LENGTH - 40) {
-    const inDense = denseZones.some(d => z >= d.start - 10 && z <= d.end + 10);
-    if (!inDense) foods.push({ z, lane: Math.floor(rng() * 3) });
+  // まばら区間: sparseGapMin〜Max間隔で1個ずつ。
+  // 直前と同じレーンは選ばない(同じレーンに置き続けると、走る側は動かずに拾えてしまい
+  // 「レーンを選ぶ」という判断が消える)。
+  let z = CONFIG.courseStartClear;
+  let lastLane = -1;
+  while (z < COURSE_LENGTH - CONFIG.courseEndClear) {
+    const inDense = denseZones.some(d =>
+      z >= d.start - CONFIG.denseEdgeBuffer && z <= d.end + CONFIG.denseEdgeBuffer);
+    if (!inDense) {
+      const choices = [0, 1, 2].filter(l => l !== lastLane);
+      const lane = choices[Math.floor(rng() * choices.length)];
+      foods.push({ z, lane });
+      lastLane = lane;
+    }
     z += CONFIG.sparseGapMin + rng() * (CONFIG.sparseGapMax - CONFIG.sparseGapMin);
   }
 
-  // 密集区間: denseRowSpacing刻みの列。1レーンだけ空けて残り2レーンに配置(たまに全レーン)
-  // 空きレーンは隣のレーンにしか動かさない=腕があれば完全回避できる配置を保証する
+  // 密集区間: rowSpacing刻みの列。必ず1レーンを空け、残り2レーンに置く(= 常に逃げ道がある)。
+  // 空きレーンは隣へしか動かさないので、追従すれば完全回避できる配置を保証している。
   for (const d of denseZones) {
     let openLane = Math.floor(rng() * 3);
+    let sameCount = 0;
     for (let rowZ = d.start; rowZ <= d.end; rowZ += d.rowSpacing) {
-      // 空きレーンは高確率で隣へ移動(左右に振られるが、隣接移動なので追従は可能=ギリギリ避けられる)
-      if (rng() < CONFIG.denseWeaveChance) {
-        openLane = Math.min(2, Math.max(0, openLane + (rng() < 0.5 ? -1 : 1)));
+      // 同じレーンが denseMaxSameLane 列続いたら強制的に動かす。
+      // これを入れないと「1・2レーンだけに食べ物が続き、3レーンがずっとガラ空き」になる。
+      const mustMove = sameCount >= CONFIG.denseMaxSameLane;
+      if (mustMove || rng() < CONFIG.denseWeaveChance) {
+        // 端では折り返す。以前は clamp していたため端で動かず、偏りの原因になっていた。
+        let dir = rng() < 0.5 ? -1 : 1;
+        if (openLane + dir < 0 || openLane + dir > 2) dir = -dir;
+        openLane += dir;
+        sameCount = 0;
+      } else {
+        sameCount++;
       }
-      const fillAll = rng() < d.allLane;
       for (let lane = 0; lane < 3; lane++) {
-        if (fillAll || lane !== openLane) foods.push({ z: rowZ, lane });
+        if (lane !== openLane) foods.push({ z: rowZ, lane });
       }
     }
     // 障害物キャラは密集区間の手前に配置
-    women.push({ z: d.start - 18, lane: Math.floor(rng() * 3) });
+    women.push({ z: d.start - CONFIG.womanLeadDist, lane: Math.floor(rng() * 3) });
   }
 
   return { foods, women };
@@ -374,6 +441,7 @@ let womanMeshes = []; // {mesh, lane, z, hit, revealT}
 
 const WOMAN_HIDE_Y = -3.2;   // 女性キャラの隠し位置(地面より下。ここから0まで上がってくる)
 const MINI_GAUGE_SIDE = 2.4; // ミニ血糖バーを主人公の何units右に置くか(大きいほど体から離れる)
+const FOOD_POP_SEC = 0.5;    // 食べた演出(+20の飛び出し・画面フチ・主人公の伸縮)の長さ(秒)
 
 // カメラが+z方向を向くため画面上はx軸が左右反転して映る。ここで符号を反転させて
 // 「右キー(lane+1)=画面の右」に合わせる(食べ物配置・当たり判定も全てこの関数を通る)
@@ -424,6 +492,7 @@ function resetGame() {
   S.zoneGauge = 0;       // 0〜100
   S.zoneActive = 0;      // ゾーン 残り秒
   S.foodBoost = 0;       // 食べた瞬間ブースト 残り秒
+  S.foodPop = 0;         // 食べた演出 残り秒
   S.zoneReady = false;   // ゾーン満タン(Zキー発動待ち)
   S.hyperTimer = 0;      // 高血糖カウントダウン 残り秒(0=非発動)
   S.shotCount = 0;
@@ -513,6 +582,8 @@ const shotPanel = document.getElementById("shotPanel");
 const shotState = document.getElementById("shotState");
 const shotBar = document.getElementById("shotBar");
 const shotVignette = document.getElementById("shotVignette");
+const foodVignette = document.getElementById("foodVignette");
+const foodPopup = document.getElementById("foodPopup");
 const dangerVignette = document.getElementById("dangerVignette");
 const zoneVignette = document.getElementById("zoneVignette");
 const hyperWarn = document.getElementById("hyperWarn");
@@ -568,6 +639,7 @@ function update(dt) {
   S.shotFlash = Math.max(0, S.shotFlash - dt);
   S.lock = Math.max(0, S.lock - dt);
   S.foodBoost = Math.max(0, S.foodBoost - dt);
+  S.foodPop = Math.max(0, S.foodPop - dt);
 
   // ゾーンゲージ
   if (S.zoneActive > 0) {
@@ -615,6 +687,7 @@ function update(dt) {
       f.mesh.visible = false;
       S.glucose += CONFIG.foodGain;
       S.foodBoost = CONFIG.foodBoostDuration; // 食べた瞬間ブースト(重ねず上書きリフレッシュ)
+      S.foodPop = FOOD_POP_SEC;               // 「+20」の飛び出しと画面フチの発光をリセット
     }
   }
 
@@ -662,7 +735,9 @@ function gameOver(type, reason) {
 /* ---- ハイスコア(localStorage) ----
    注意: file:// で直接開いた場合と Pages の URL では保存先が別扱いになる。
    チームでタイムを比べるなら全員が同じ URL で遊ぶこと。 */
-const HS_KEY = "manjaro_proto_best_sec";
+// キーにコース長を含める。コース長を変えると記録が別枠になるので、
+// 旧コースの短いタイムが「二度と更新できないベスト」として残り続けるのを防げる。
+const HS_KEY = "manjaro_proto_best_" + Math.round(COURSE_LENGTH);
 
 function loadBest() {
   try {
@@ -707,7 +782,13 @@ function updateHUD() {
   const pct = Math.round(rampMult()
     * (S.zoneActive > 0 ? CONFIG.zoneSpeedMult : (S.foodBoost > 0 ? CONFIG.foodBoostMult : 1)) * 100);
   speedNum.textContent = `速度 ${pct}%`
-    + (S.zoneActive > 0 ? " 🌟ゾーン!!" : (S.foodBoost > 0 ? " ⚡ブースト!" : ""));
+    + (S.zoneActive > 0 ? " 🌟ゾーン!!" : (S.foodBoost > 0 ? " ⚡⚡ 加速!!" : ""));
+
+  // 食べた瞬間、血糖の数字を跳ねさせる(数字がどこで動いたのか気付かせる)
+  const popT = S.foodPop / FOOD_POP_SEC;   // 1 → 0
+  glucoseNum.style.transform = popT > 0 ? `scale(${1 + popT * 0.7})` : "";
+  glucoseNum.style.color = popT > 0 ? "#ffb02e" : "";
+  foodVignette.style.opacity = popT > 0 ? (popT * 0.9) : 0;
 
   zoneBar.style.width = S.zoneGauge + "%";
   if (S.zoneActive > 0) {
@@ -765,6 +846,11 @@ function render() {
   // 走りの上下ゆれ
   player.position.y = Math.abs(Math.sin(S.elapsed * 12)) * 0.15;
 
+  // 食べた瞬間、主人公を一瞬ふくらませる(取れたことを自機の動きでも伝える)
+  const popT = S.foodPop / FOOD_POP_SEC;
+  if (popT > 0) player.scale.set(1 + popT * 0.35, 1 + popT * 0.2, 1 + popT * 0.35);
+  else player.scale.set(1, 1, 1);
+
   // カメラは真後ろ固定
   camera.position.set(S.x, 5, S.z - 11);
   camera.lookAt(S.x, 1.5, S.z + 12);
@@ -794,6 +880,19 @@ function render() {
     miniGauge.classList.add("hidden");
   }
 
+  // 「+20」を主人公の上に飛び出させる(残り時間に応じて上へ動かしながら消す)
+  if (S.state === "running" && popT > 0) {
+    foodPopup.classList.remove("hidden");
+    foodPopup.textContent = "+" + CONFIG.foodGain;
+    const rise = (1 - popT) * 1.8;   // 時間が経つほど上へ
+    const p = new THREE.Vector3(S.x, 3.6 + rise, S.z).project(camera);
+    foodPopup.style.left = ((p.x * 0.5 + 0.5) * innerWidth) + "px";
+    foodPopup.style.top = ((-p.y * 0.5 + 0.5) * innerHeight) + "px";
+    foodPopup.style.opacity = Math.min(1, popT * 2);   // 最後だけフェードアウト
+  } else {
+    foodPopup.classList.add("hidden");
+  }
+
   // 食べ物をぷかぷか回す
   for (const f of foodMeshes) {
     if (!f.eaten) f.mesh.rotation.y += 0.02;
@@ -821,7 +920,7 @@ function loop(now) {
 // 開始前も背景だけ描画しておく
 S.state = "ready"; S.x = 0; S.z = 0; S.glucose = 50; S.elapsed = 0;
 S.zoneGauge = 0; S.zoneActive = 0; S.shotFlash = 0; S.shotCooldown = 0; S.lock = 0;
-S.foodBoost = 0; S.robbedCount = 0; S.shotCount = 0; S.clearedCount = 0; S.lastCleared = 0;
+S.foodBoost = 0; S.foodPop = 0; S.robbedCount = 0; S.shotCount = 0; S.clearedCount = 0; S.lastCleared = 0;
 S.zoneTotal = 0; S.hyperTimer = 0; S.zoneReady = false;
 spawnCourse();
 render();
