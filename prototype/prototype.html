@@ -25,8 +25,16 @@
   #zoneBar { height: 100%; width: 0%; background: linear-gradient(to right, #fc0, #f90); }
   #zonePanel.active .label { color: #fc0; font-weight: bold; }
 
-  /* タイム(上中央) */
-  #timePanel { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); font-size: 28px; font-weight: bold; text-shadow: 0 0 6px #000; }
+  /* ゴールまでの進捗(画面最上部の細いバー)。走っている位置が一目で分かる */
+  #progressWrap { position: absolute; top: 0; left: 0; right: 0; height: 7px; background: rgba(0,0,0,.5); }
+  #progressBar { height: 100%; width: 0%; background: linear-gradient(to right, #4f9, #fc0); }
+
+  /* タイム(上中央)とその下の補助情報(ベストタイム / ゴールまでの残り) */
+  #timePanel { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); font-size: 28px; font-weight: bold; text-shadow: 0 0 6px #000; }
+  #timeSub { position: absolute; top: 54px; left: 50%; transform: translateX(-50%);
+    font-size: 13px; text-shadow: 0 0 5px #000; white-space: nowrap; opacity: .9; }
+  #timeSub .ahead  { color: #6f6; font-weight: bold; }  /* ベストを上回るペース */
+  #timeSub .behind { color: #f88; }                     /* 下回るペース */
 
   /* マンジャロ(右下)。状態が4つあるので、色・アイコン・ゲージ・動きの4系統で見分けさせる */
   #shotPanel { position: absolute; right: 20px; bottom: 20px; width: 220px; text-align: center;
@@ -46,10 +54,16 @@
     50%     { box-shadow: 0 0 24px 5px rgba(110,255,110,.5); }
   }
 
-  /* 補充中:灰色に沈めて、ゲージが溜まりきるまで押せないことを示す */
+  /* 次回投与待ち:7日分の目盛りを出し、「補充」ではなく週1回の投与間隔だと示す */
   #shotPanel.cooldown { border-color: #7a7a86; }
   #shotPanel.cooldown #shotIcon { filter: grayscale(1); opacity: .45; }
   #shotPanel.cooldown #shotBar  { background: #8ab4dd; }
+  #shotPanel.cooldown #shotBarWrap {
+    background-color: rgba(255,255,255,.12);
+    background-image: repeating-linear-gradient(to right,
+      transparent 0, transparent calc(14.285% - 2px),
+      rgba(255,255,255,.5) calc(14.285% - 2px), rgba(255,255,255,.5) 14.285%);
+  }
 
   /* 奪われた:揺らして「取り上げられた」感を出す + 注射器に大きな✕ */
   #shotPanel.locked { border-color: #f4a; background: rgba(85,0,40,.65); animation: shotShake .55s ease-in-out infinite; }
@@ -98,18 +112,10 @@
                           animation: blinkCold .75s infinite; }
 
   /* 高血糖カウントダウン警告(中央上に大きく) */
-  #hyperWarn { position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+  #hyperWarn { position: absolute; top: 82px; left: 50%; transform: translateX(-50%);
     font-size: 30px; font-weight: bold; color: #f33; text-shadow: 0 0 8px #000;
     background: rgba(0,0,0,.6); border: 3px solid #f33; border-radius: 12px; padding: 8px 20px;
     animation: blink .4s infinite; white-space: nowrap; }
-
-  /* 壁(3個並び)の接近警告。霧で見えるのは約2.4秒前だがクールタイムは7秒なので、
-     見えてから撃つのでは間に合わない。先に知らせて準備させるための表示 */
-  #wallWarn { position: absolute; top: 120px; left: 50%; transform: translateX(-50%);
-    font-size: 24px; font-weight: bold; color: #ffd34d; text-shadow: 0 0 8px #000;
-    background: rgba(60,30,0,.75); border: 3px solid #ffd34d; border-radius: 12px;
-    padding: 7px 18px; white-space: nowrap; }
-  #wallWarn.urgent { animation: blink .35s infinite; color: #fff; background: rgba(140,60,0,.85); }
 
   /* 危険点滅・ゾーン発動の画面演出 */
   /* 危険の画面フチ。高血糖=赤 / 低血糖=青 で完全に分ける。
@@ -162,13 +168,14 @@
     <div class="label" id="zoneLabel">ゾーンゲージ(ゲージ中央キープで蓄積)</div>
     <div id="zoneBarWrap"><div id="zoneBar"></div></div>
   </div>
+  <div id="progressWrap"><div id="progressBar"></div></div>
   <div id="timePanel">0.00</div>
+  <div id="timeSub"></div>
   <div id="hyperWarn" class="hidden">⚠ 高血糖! あと 3.0 秒</div>
-  <div id="wallWarn" class="hidden">🚧 壁が来る! スペースで消せ</div>
   <div id="miniGauge" class="hidden"><div id="miniNeedle"></div></div>
   <div id="shotPanel" class="ready">
     <div id="shotIcon">💉</div>
-    <div id="shotTitle">マンジャロ</div>
+    <div id="shotTitle">マンジャロ｜週1回投与</div>
     <div id="shotState">スペースで注射</div>
     <div id="shotBarWrap"><div id="shotBar"></div></div>
   </div>
@@ -247,10 +254,9 @@ const CONFIG = {
   // 「取れた」感は速度ではなく演出だけで出す(FOOD_POP_SEC まわり)。
   shotClearSec      : 2.5,    // 注射:前方「走行速度×この秒数」の食べ物を全レーンまとめて消去
                               //       距離固定だと序盤(速度50)と終盤(速度120)で効果が別物になるため時間で持つ
-  shotCooldown      : 7,      // 注射クールタイム(秒)
-  shotFreezeSec     : 2.0,    // 注射の直後、血糖の自然減少を止める秒数(新規)
-                              //   消すと血糖が上がらない=低血糖に近づくだけ、という純粋な損を和らげる。
-                              //   ただし高血糖(stableMax超)の間は止めない。止めると自力で下げられなくなるため
+  shotCooldown      : 7,      // 現実の週1回投与を、ゲーム内では7秒=7日として圧縮表現
+  shotEffectSec     : 2.0,    // 使用後、食べ物を取っても血糖が上昇しない時間
+  shotDrainMult     : 0.8,    // 効果中の血糖降下速度(通常の80%。止まりはしない)
   lockDuration      : 7,      // 女性接触時の注射ロック(秒)
   zoneChargePerSec  : 8,      // 緑帯 滞在中のゲージ蓄積(%/秒)(20→8 満タンまで5秒→12.5秒)
                               //   ゾーンが何度も撃てるとマンジャロを使う意味が消えるため遅くした
@@ -288,11 +294,12 @@ const CONFIG = {
   finalWallAt       : 0.90,   // 【終盤のみ】3個並びの壁を置く位置(コース長に対する割合)(新規)
   finalWallRows     : 4,      // 壁を何列連続させるか(新規)
                               //   4列×65units=260units。マンジャロ1発の消去範囲(終盤で約458units)に収まる幅にしてある
-  wallWarnSec       : 9,      // 壁の何秒前から警告を出すか(新規)
-                              //   霧で見えるのは約2.4秒前だが、クールタイムは7秒。
-                              //   見えてから撃つのでは間に合わないので、先に警告を出して準備させる。
-                              //   【必ず shotCooldown より大きくすること】小さいと、警告を見た時点で
-                              //   撃てず、どうやっても壁を抜けられない状況が生まれる
+  wallSignLeadSec   : 8,      // 壁の何秒手前に警告看板を立てるか(新規)
+                              //   看板自体は約300units手前(カメラの描画限界)から見えるので、
+                              //   実際に気付けるのは「この秒数 + 約1.6秒」前になる。
+                              //   【必ず shotCooldown より大きくすること】小さいと、看板を見た時点で
+                              //   クールタイム中=どうやっても壁を抜けられない状況が生まれる
+  wallSignNearSec   : 2,      // 壁の直前にもう1枚立てる位置(秒)。こちらは念押し用
   courseStartClear  : 40,     // スタート直後、食べ物を置かない距離
   courseEndClear    : 40,     // ゴール直前、食べ物を置かない距離
   denseEdgeBuffer   : 10,     // 密集区間の前後に空ける距離(まばらの食べ物が混ざらないように)
@@ -317,6 +324,12 @@ function mulberry32(a) {
 
 // 加速するので、想定プレイ時間×平均速度でコース長を決める
 const COURSE_LENGTH = CONFIG.baseSpeed * CONFIG.courseLengthSec * (1 + CONFIG.rampEndMult) / 2;
+
+// 地点 z における走行速度(units/秒)。看板の配置など「何秒手前か」を距離に直すのに使う
+function speedAtZ(z) {
+  const p = Math.max(0, Math.min(1, z / COURSE_LENGTH));
+  return CONFIG.baseSpeed * (1 + (CONFIG.rampEndMult - 1) * Math.pow(p, CONFIG.rampCurve));
+}
 
 // 密集区間の位置。コース長に対する割合(0〜1)で指定する。
 // 行を足せば3ヶ所目・4ヶ所目が作れる。rowSpacing は小さいほど密。
@@ -523,7 +536,38 @@ const womanMatBody = new THREE.MeshLambertMaterial({ color: 0xdd2255 });
 
 let foodMeshes = [];  // {mesh, lane, z, eaten}
 let womanMeshes = []; // {mesh, lane, z, hit, revealT}
-let wallRanges = [];  // {start, end} 3個並びの壁の範囲(警告表示に使う)
+let wallRanges = [];  // {start, end} 3個並びの壁の範囲
+let signMeshes = [];  // 壁の手前に立てる警告看板(見た目だけ。当たり判定はない)
+
+// 壁の予告看板。本番はイラストの看板になる想定なので、ここでは箱で形だけ作る。
+// 「3レーン全部ふさがっている」ことが絵で分かるように、板の上に赤いブロックを3つ並べる。
+function makeWallSign() {
+  const g = new THREE.Group();
+  const post = new THREE.Mesh(
+    new THREE.BoxGeometry(0.4, 5.5, 0.4),
+    new THREE.MeshLambertMaterial({ color: 0x6b6b73 })
+  );
+  post.position.y = 2.75;
+  g.add(post);
+
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(6.2, 3.4, 0.3),
+    new THREE.MeshLambertMaterial({ color: 0xffcc00 })
+  );
+  board.position.y = 6.2;
+  g.add(board);
+
+  // 板の手前側(プレイヤーは -z から +z へ進むので、-z 側が正面)に赤いブロック3つ
+  for (const dx of [-1.7, 0, 1.7]) {
+    const b = new THREE.Mesh(
+      new THREE.BoxGeometry(1.3, 1.3, 0.12),
+      new THREE.MeshLambertMaterial({ color: 0xcc2222 })
+    );
+    b.position.set(dx, 6.2, -0.22);
+    g.add(b);
+  }
+  return g;
+}
 
 const WOMAN_HIDE_Y = -3.2;   // 女性キャラの隠し位置(地面より下。ここから0まで上がってくる)
 const MINI_GAUGE_SIDE = 2.4; // ミニ血糖バーを主人公の何units右に置くか(大きいほど体から離れる)
@@ -536,11 +580,29 @@ function laneToX(lane) { return (1 - lane) * CONFIG.laneWidth; }
 function spawnCourse() {
   for (const f of foodMeshes) scene.remove(f.mesh);
   for (const w of womanMeshes) scene.remove(w.mesh);
+  for (const s of signMeshes) scene.remove(s);
   foodMeshes = [];
   womanMeshes = [];
+  signMeshes = [];
 
   const layout = buildLayout();
   wallRanges = layout.walls;
+
+  // 壁の予告看板を道の両脇に立てる。「何秒手前か」で位置を決めるので、
+  // 速度が変わっても気付くまでの時間は一定に保たれる。
+  for (const w of wallRanges) {
+    const speed = speedAtZ(w.start);
+    for (const leadSec of [CONFIG.wallSignLeadSec, CONFIG.wallSignNearSec]) {
+      const z = w.start - speed * leadSec;
+      if (z < 0) continue;
+      for (const side of [-1, 1]) {
+        const sign = makeWallSign();
+        sign.position.set(side * (CONFIG.laneWidth * 1.5 + 2.5), 0, z);
+        scene.add(sign);
+        signMeshes.push(sign);
+      }
+    }
+  }
   for (const f of layout.foods) {
     const mesh = new THREE.Mesh(foodGeo, foodMat.clone());
     mesh.position.set(laneToX(f.lane), 1.0, f.z);
@@ -573,9 +635,9 @@ function resetGame() {
   S.lane = 1;            // 0=左 1=中 2=右
   S.x = 0;
   S.elapsed = 0;
-  S.shotCooldown = 0;    // クールタイム 残り秒
+  S.shotCooldown = 0;    // 次回投与までの残り時間(ゲーム内7秒=7日)
   S.shotFlash = 0;       // 注射を撃った手応えの表示 残り秒
-  S.shotFreeze = 0;      // 注射直後、血糖の減少が止まっている 残り秒
+  S.shotEffect = 0;      // 食べても血糖が上昇せず、降下が緩やかになる残り秒
   S.lock = 0;            // 注射ロック 残り秒
   S.zoneGauge = 0;       // 0〜100
   S.zoneActive = 0;      // ゾーン 残り秒
@@ -585,8 +647,10 @@ function resetGame() {
   S.shotCount = 0;
   S.clearedCount = 0;    // 注射で消した食べ物の総数
   S.lastCleared = 0;     // 直近1回で消した数
+  S.foodBlocked = false; // 直近の食べ物がマンジャロ効果で血糖上昇しなかったか
   S.zoneTotal = 0;
   S.robbedCount = 0;     // 奪われ(ロック)回数
+  S.bestAtStart = loadBest();  // 走行中の表示用。毎フレーム localStorage を読まないよう開始時に1回だけ
   spawnCourse();
   hide(overOverlay); hide(goalOverlay);
 }
@@ -632,9 +696,9 @@ addEventListener("keydown", (e) => {
   }
 });
 
-// 注射(マンジャロ)= 目の前の食べ物をまとめて消す。効果は一瞬で、持続しない。
+// 注射(マンジャロ)= 目の前の食べ物をまとめて消し、効果中は食べても血糖が上がらない。
 // 「食べたいのに食べられない」ではなく「誘惑そのものが消える」形にした(薬の作用に近い)。
-// 代償は血糖が上がらないこと=そのまま低血糖に近づくこと。
+// 血糖の自然減少は少し緩やかになるだけで止まらないため、低血糖のリスクは残る。
 function tryShot() {
   if (S.state !== "running") return;
   if (S.lock > 0 || S.shotCooldown > 0) return; // 不発
@@ -652,7 +716,7 @@ function tryShot() {
   S.clearedCount += cleared;
   S.lastCleared = cleared;  // 直近1回で何個消えたか(パネルの表示用)
   S.shotFlash = 0.35;
-  S.shotFreeze = CONFIG.shotFreezeSec; // 消した直後は血糖が減らない(消し損の緩和)
+  S.shotEffect = CONFIG.shotEffectSec;
 }
 
 /* ================================================================
@@ -666,6 +730,8 @@ const zonePanel = document.getElementById("zonePanel");
 const zoneLabel = document.getElementById("zoneLabel");
 const zoneBar = document.getElementById("zoneBar");
 const timePanel = document.getElementById("timePanel");
+const timeSub = document.getElementById("timeSub");
+const progressBar = document.getElementById("progressBar");
 const shotPanel = document.getElementById("shotPanel");
 const shotState = document.getElementById("shotState");
 const shotBar = document.getElementById("shotBar");
@@ -675,7 +741,6 @@ const foodPopup = document.getElementById("foodPopup");
 const dangerVignette = document.getElementById("dangerVignette");
 const zoneVignette = document.getElementById("zoneVignette");
 const hyperWarn = document.getElementById("hyperWarn");
-const wallWarn = document.getElementById("wallWarn");
 const miniGauge = document.getElementById("miniGauge");
 const miniNeedle = document.getElementById("miniNeedle");
 
@@ -702,8 +767,8 @@ const miniNeedle = document.getElementById("miniNeedle");
 document.getElementById("ruleHyper").textContent =
   `血糖値 ${CONFIG.hyperThreshold} 超で高血糖カウントダウン(${CONFIG.hyperGraceSec}秒以内に ${CONFIG.hyperResetBelow} 以下へ)、0 で低血糖。どちらも倒れる。`;
 document.getElementById("ruleShot").textContent =
-  `スペース=マンジャロ。目の前の食べ物がまとめて消える(クールタイム ${CONFIG.shotCooldown}秒)。`
-  + `直後の${CONFIG.shotFreezeSec}秒は血糖が減らない。終盤には「消さないと抜けられない壁」がある。`;
+  `スペース=マンジャロ。目の前の食べ物がまとめて消え、${CONFIG.shotEffectSec}秒間は食べても血糖が上がらない。`
+  + `血糖はゆっくり下がり続ける。週1回投与を7秒に圧縮しているため、次の使用まで間隔が必要。`;
 document.getElementById("ruleZone").textContent =
   `ゲージの緑(${CONFIG.zoneBandMin}〜${CONFIG.zoneBandMax})をキープするとゾーンが溜まり、Z キーで超加速。`
   + `女性はすり抜けるが、食べ物はすり抜けない——食べ物地帯でゾーンを撃つと血糖が急騰する。`;
@@ -715,8 +780,7 @@ let lastT = performance.now();
 
 function rampMult() {
   // 進行度に応じて 1.0 → rampEndMult まで加速し続ける(血糖値は速度に関与しない)
-  const p = Math.max(0, Math.min(1, S.z / COURSE_LENGTH));
-  return 1 + (CONFIG.rampEndMult - 1) * Math.pow(p, CONFIG.rampCurve);
+  return speedAtZ(S.z) / CONFIG.baseSpeed;
 }
 
 function update(dt) {
@@ -724,19 +788,17 @@ function update(dt) {
 
   // 血糖の自然減少。
   // ゾーン中も血糖は普通に動く(ゾーンを「安全地帯」にするとマンジャロの役割が消えるため)。
-  // マンジャロ直後だけ減少が止まるが、高血糖の間は止めない
-  // ——止めてしまうと自分で血糖を下げる手段が無くなり、撃つこと自体が自殺行為になる。
-  const drainFrozen = S.shotFreeze > 0 && S.glucose <= CONFIG.stableMax;
-  if (!drainFrozen) {
-    const drain = S.glucose > CONFIG.stableMax ? CONFIG.drainPerSecHigh : CONFIG.drainPerSec;
-    S.glucose -= drain * dt;
-  }
+  // マンジャロ効果中も血糖は下がり続ける。通常の80%に緩めるだけで、
+  // 食べ物による上昇がないまま使い続けると低血糖へ近づく。
+  const baseDrain = S.glucose > CONFIG.stableMax ? CONFIG.drainPerSecHigh : CONFIG.drainPerSec;
+  const drain = baseDrain * (S.shotEffect > 0 ? CONFIG.shotDrainMult : 1);
+  S.glucose -= drain * dt;
 
   // タイマー類
   S.elapsed += dt;
   S.shotCooldown = Math.max(0, S.shotCooldown - dt);
   S.shotFlash = Math.max(0, S.shotFlash - dt);
-  S.shotFreeze = Math.max(0, S.shotFreeze - dt);
+  S.shotEffect = Math.max(0, S.shotEffect - dt);
   S.lock = Math.max(0, S.lock - dt);
   S.foodPop = Math.max(0, S.foodPop - dt);
 
@@ -781,8 +843,9 @@ function update(dt) {
     if (Math.abs(f.z - S.z) < CONFIG.collectDist && Math.abs(laneToX(f.lane) - S.x) < CONFIG.laneWidth * 0.45) {
       f.eaten = true;
       f.mesh.visible = false;
-      S.glucose += CONFIG.foodGain;
-      S.foodPop = FOOD_POP_SEC;   // 「+20」の飛び出しと画面フチの発光をリセット(速度は変えない)
+      S.foodBlocked = S.shotEffect > 0;
+      if (!S.foodBlocked) S.glucose += CONFIG.foodGain;
+      S.foodPop = FOOD_POP_SEC;   // 「+20」または「上昇なし」の表示をリセット
     }
   }
 
@@ -868,17 +931,17 @@ function goal() {
   show(goalOverlay);
 }
 
-// まだ通過していない壁までの到達秒数。警告の対象がなければ null。
-// 距離ではなく秒で返すのは、クールタイム(7秒)と直接比べたいから。
-function secondsToNextWall() {
-  const speed = CONFIG.baseSpeed * rampMult();
-  for (const w of wallRanges) {
-    if (S.z > w.end) continue;             // もう抜けた
-    const sec = (w.start - S.z) / speed;
-    if (sec <= CONFIG.wallWarnSec) return Math.max(0, sec);
-    return null;                            // まだ遠い
+// ゴールまでの残り秒数。速度は場所によって変わるので、区間に分けて足し上げる。
+// 式で解かずに数値積分にしてあるのは、rampCurve を変えても正しい値が出るようにするため。
+function secondsToGoal() {
+  const remain = COURSE_LENGTH - S.z;
+  if (remain <= 0) return 0;
+  const steps = 24;
+  let t = 0;
+  for (let i = 0; i < steps; i++) {
+    t += (remain / steps) / speedAtZ(S.z + remain * (i + 0.5) / steps);
   }
-  return null;
+  return t;
 }
 
 function updateHUD() {
@@ -913,7 +976,28 @@ function updateHUD() {
 
   timePanel.textContent = S.state === "running" ? S.elapsed.toFixed(2) : timePanel.textContent;
 
-  // ゲージは常に「満タン = 使える」で統一する(奪われ中も補充中も、溜まりきったら撃てる)
+  // ゴールまでの進捗バー + ベストタイム + 残り時間
+  const prog = Math.max(0, Math.min(1, S.z / COURSE_LENGTH));
+  progressBar.style.width = (prog * 100) + "%";
+  if (S.state === "running") {
+    const left = secondsToGoal();
+    const best = S.bestAtStart;
+    let sub = `ゴールまで 約${left.toFixed(0)}秒(${Math.round(prog * 100)}%)`;
+    if (best !== null) {
+      // 今のペースでゴールしたときの予測タイムをベストと比べる。
+      // 「さっきより速いか」がゴール後まで分からないと、走り直す動機が出ないため。
+      const predicted = S.elapsed + left;
+      const diff = predicted - best;
+      const cls = diff < 0 ? "ahead" : "behind";
+      const sign = diff < 0 ? "−" : "+";
+      sub += `　ベスト ${best.toFixed(2)}秒 <span class="${cls}">${sign}${Math.abs(diff).toFixed(1)}</span>`;
+    } else {
+      sub += "　ベスト --";
+    }
+    timeSub.innerHTML = sub;
+  }
+
+  // ゲージは常に「満タン = 使える」で統一する。
   shotPanel.className = "";
   // 撃った直後に女性に当たった場合は「奪われた」を優先する(緊急度が高いため)。
   // 画面フチの水色フラッシュは firing に紐づくので、消去の手応え自体は残る。
@@ -930,13 +1014,14 @@ function updateHUD() {
     shotBar.style.width = "100%";
   } else if (S.shotCooldown > 0) {
     shotPanel.classList.add("cooldown");
-    shotState.textContent = S.shotFreeze > 0
-      ? `血糖の減少を停止中\nあと ${S.shotFreeze.toFixed(1)} 秒`
-      : `補充中\nあと ${S.shotCooldown.toFixed(1)} 秒`;
+    const daysLeft = Math.max(1, Math.ceil(S.shotCooldown / CONFIG.shotCooldown * 7));
+    shotState.textContent = S.shotEffect > 0
+      ? `作用中:血糖上昇なし\n低下はゆっくり継続`
+      : `今週分を投与済み\n次回投与まで あと${daysLeft}日`;
     shotBar.style.width = ((1 - S.shotCooldown / CONFIG.shotCooldown) * 100) + "%";
   } else {
     shotPanel.classList.add("ready");
-    shotState.textContent = "スペースで注射\n前方の食べ物を消す";
+    shotState.textContent = "投与日:使用できます\nスペースで注射";
     shotBar.style.width = "100%";
   }
   shotVignette.className = firing ? "on" : "";
@@ -954,19 +1039,6 @@ function updateHUD() {
     hyperWarn.classList.add("hidden");
   }
 
-  // 壁の接近警告。壁までの残り時間で表示を切り替える
-  const wallSec = secondsToNextWall();
-  if (S.state === "running" && wallSec !== null) {
-    wallWarn.classList.remove("hidden");
-    // クールタイムが明けないうちに壁へ着くなら赤く急かす
-    const tooLate = S.shotCooldown > wallSec || S.lock > wallSec;
-    wallWarn.classList.toggle("urgent", tooLate || wallSec < 2);
-    wallWarn.textContent = tooLate
-      ? `🚧 壁まで ${wallSec.toFixed(1)}秒 — マンジャロが間に合わない!`
-      : `🚧 壁まで ${wallSec.toFixed(1)}秒 — スペースで消せ`;
-  } else {
-    wallWarn.classList.add("hidden");
-  }
   zoneVignette.className = S.zoneActive > 0 ? "on" : "";
 }
 
@@ -1013,7 +1085,7 @@ function render() {
   // 「+20」を主人公の上に飛び出させる(残り時間に応じて上へ動かしながら消す)
   if (S.state === "running" && popT > 0) {
     foodPopup.classList.remove("hidden");
-    foodPopup.textContent = "+" + CONFIG.foodGain;
+    foodPopup.textContent = S.foodBlocked ? "血糖上昇なし" : "+" + CONFIG.foodGain;
     const rise = (1 - popT) * 1.8;   // 時間が経つほど上へ
     const p = new THREE.Vector3(S.x, 3.6 + rise, S.z).project(camera);
     foodPopup.style.left = ((p.x * 0.5 + 0.5) * innerWidth) + "px";
@@ -1049,9 +1121,9 @@ function loop(now) {
 
 // 開始前も背景だけ描画しておく
 S.state = "ready"; S.x = 0; S.z = 0; S.glucose = 50; S.elapsed = 0;
-S.zoneGauge = 0; S.zoneActive = 0; S.shotFlash = 0; S.shotFreeze = 0; S.shotCooldown = 0; S.lock = 0;
-S.foodPop = 0; S.robbedCount = 0; S.shotCount = 0; S.clearedCount = 0; S.lastCleared = 0;
-S.zoneTotal = 0; S.hyperTimer = 0; S.zoneReady = false;
+S.zoneGauge = 0; S.zoneActive = 0; S.shotFlash = 0; S.shotEffect = 0; S.shotCooldown = 0; S.lock = 0;
+S.foodPop = 0; S.foodBlocked = false; S.robbedCount = 0; S.shotCount = 0; S.clearedCount = 0; S.lastCleared = 0;
+S.zoneTotal = 0; S.hyperTimer = 0; S.zoneReady = false; S.bestAtStart = loadBest();
 spawnCourse();
 render();
 requestAnimationFrame(loop);
