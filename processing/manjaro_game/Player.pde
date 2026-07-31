@@ -51,9 +51,67 @@ class Runner {
   float sweatTimer = 0;
   int sweatSide = -1;
 
+  // 30コマそれぞれの「実際に絵が描かれている範囲」。
+  // 生成した絵はコマごとに位置も大きさもバラバラで(実測: 体の中心が最大113px、
+  // 足元が37pxもずれている)、固定の切り出しでは左右にガタつき、地面に沈んだり浮いたりする。
+  // 起動時に1回だけ実測し、足元と体の中心を揃えて描くことでカクつきを消す。
+  int[] frameX = new int[30];
+  int[] frameY = new int[30];
+  int[] frameW = new int[30];
+  int[] frameH = new int[30];
+  float frameScale = 1;      // 全コマ共通の倍率。コマごとに変えるとサイズが揺れる
+  boolean framesMeasured = false;
+
   Runner(PImage[] sheetImages, PImage spriteImage) {
     cycleSheets = sheetImages;
     sprite = spriteImage;
+    measureFrames();
+  }
+
+  // 各コマの不透明ピクセルの外接矩形を求める。
+  void measureFrames() {
+    if (cycleSheets == null || cycleSheets.length != 5) return;
+
+    int tallest = 1;
+    for (int f = 0; f < 30; f++) {
+      PImage sheet = cycleSheets[f / 6];
+      if (sheet == null) return;
+      sheet.loadPixels();
+
+      int cellW = sheet.width / 3;
+      int cellH = sheet.height / 2;
+      int local = f % 6;
+      int ox = (local % 3) * cellW;
+      int oy = (local / 3) * cellH;
+
+      int minX = cellW, maxX = -1, minY = cellH, maxY = -1;
+      for (int y = 0; y < cellH; y++) {
+        int rowBase = (oy + y) * sheet.width + ox;
+        for (int x = 0; x < cellW; x++) {
+          if (((sheet.pixels[rowBase + x] >> 24) & 0xFF) > 40) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX < 0) {   // 透明だけのコマ。念のためセル全体を使う
+        minX = 0; minY = 0; maxX = cellW - 1; maxY = cellH - 1;
+      }
+
+      frameX[f] = ox + minX;
+      frameY[f] = oy + minY;
+      frameW[f] = maxX - minX + 1;
+      frameH[f] = maxY - minY + 1;
+      if (frameH[f] > tallest) tallest = frameH[f];
+    }
+
+    // 一番背の高いコマが PLAYER_HEIGHT になるよう、全コマを同じ倍率で描く。
+    // コマごとに高さを揃えると、走行中の縮み(接地時のスクワッシュ)まで潰れて不自然になる。
+    frameScale = PLAYER_HEIGHT / float(tallest);
+    framesMeasured = true;
+    println("走行コマの自動整列: 完了(基準の高さ " + tallest + "px, 倍率 " + nf(frameScale, 1, 3) + ")");
   }
 
   void reset() {
@@ -122,7 +180,7 @@ class Runner {
     fill(49, 25, 15, 92);
     ellipse(screenX, PLAYER_BASE_Y + 4, 154 + landing * 18, 24 - landing * 3);
 
-    if (cycleSheets != null && cycleSheets.length == 5 && cycleSheets[0] != null) {
+    if (framesMeasured) {
       drawThirtyFrameCycle(bob, laneLean, squashX, squashY);
     } else if (sprite != null) {
       float aspect = float(sprite.width) / float(sprite.height);
@@ -154,32 +212,22 @@ class Runner {
   }
 
   void drawPose(int frame30, float squashX, float squashY) {
-    int sheetIndex = frame30 / 6;
-    int localFrame = frame30 % 6;
-    PImage sheet = cycleSheets[sheetIndex];
-    int col = localFrame % 3;
-    int row = localFrame / 3;
-    int cellW = sheet.width / 3;
-    int cellH = sheet.height / 2;
+    PImage sheet = cycleSheets[frame30 / 6];
 
-    // 各セルの余白だけを除き、30枚すべてを同じ大きさで描く。
-    int sideInset = 54;
-    int verticalInset = 6;
-    int cropX = col * cellW + sideInset;
-    int cropY = row * cellH + verticalInset;
-    int cropW = cellW - sideInset * 2;
-    int cropH = cellH - verticalInset * 2;
-
-    float drawH = PLAYER_HEIGHT * squashY;
-    float drawW = drawH * (float(cropW) / float(cropH)) * squashX;
+    // 実測した外接矩形をそのまま切り出す。固定の余白(旧 sideInset=54)だと、
+    // セルの左端から絵が始まっているコマで体の左側が切り落とされていた。
+    float drawW = frameW[frame30] * frameScale * squashX;
+    float drawH = frameH[frame30] * frameScale * squashY;
 
     noTint();
     imageMode(CENTER);
+    // 呼び出し元が原点を「足元」に移してあるので、中心を上へ半分ずらせば足が接地する。
+    // 切り出しが外接矩形ぴったりなので、これで全コマの足元と中心が完全に揃う。
     image(
       sheet,
       0, -drawH * 0.5, drawW, drawH,
-      cropX, cropY,
-      cropX + cropW, cropY + cropH
+      frameX[frame30], frameY[frame30],
+      frameX[frame30] + frameW[frame30], frameY[frame30] + frameH[frame30]
     );
     imageMode(CORNER);
   }
