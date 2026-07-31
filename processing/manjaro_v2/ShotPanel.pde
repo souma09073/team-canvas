@@ -3,9 +3,10 @@
 //
 // このゲームでマンジャロが連続で打てないのは、ゲーム上の都合ではなく
 // 現実の投与間隔(週1回)を再現しているから。
-// そのため表示は「補充中」ではなく「今週分を投与済み / 次回投与まであと○日」とし、
+// 1エリア = 1週間 とみなし、エリアごとに1回だけ打てる。
+//
+// そのため表示は「補充中」ではなく「今週分は投与済み」とし、
 // 待たされている理由が薬のルールだと伝わる言い方にしている。
-// ゲーム内の 7秒 = 現実の 7日 として圧縮している。
 // ============================================================
 
 class ShotPanel {
@@ -22,37 +23,31 @@ class ShotPanel {
 
     drawFrame(px, py, frameColor);
     drawLabels(g, px, py, frameColor);
-    drawIntervalBar(g, px, py, frameColor);
+    drawWeekMarks(g, px, py, frameColor);
   }
 
-  // 状態を色で表す。緑=打てる / 白=いま打った / ピンク=奪われた / 灰=投与待ち
+  // 状態を色で表す。緑=打てる / 白=効いている / ピンク=奪われた / 灰=今週分は使用済み
   int stateColor(Game g) {
-    if (g.lock > 0)          return C_SHOT_ROBBED;
-    if (g.shotFlash > 0)     return C_SHOT_FIRED;
-    if (g.shotCooldown > 0)  return C_SHOT_WAIT;
-    return C_SHOT_READY;
+    if (g.lock > 0)       return C_SHOT_ROBBED;
+    if (g.shotEffect > 0) return C_SHOT_FIRED;
+    if (g.canShoot())     return C_SHOT_READY;
+    return C_SHOT_WAIT;
   }
 
   // 1行目:いまどういう状態か
   String title(Game g) {
-    if (g.lock > 0)         return "奪われた";
-    if (g.shotFlash > 0)    return "投与!";
-    if (g.shotCooldown > 0) return g.shotEffect > 0 ? "作用中:血糖上昇なし" : "今週分を投与済み";
-    return "投与日:使用できます";
+    if (g.lock > 0)       return "奪われた";
+    if (g.shotEffect > 0) return "作用中";
+    if (g.canShoot())     return "投与できます";
+    return "今週分は投与済み";
   }
 
   // 2行目:その補足
   String subtitle(Game g) {
-    if (g.lock > 0) return "取り返すまで " + nf(g.lock, 1, 1) + " 秒";
-    if (g.shotFlash > 0) {
-      return g.lastCleared > 0 ? "食べ物 " + g.lastCleared + " 個を消した" : "前方に食べ物なし";
-    }
-    if (g.shotCooldown > 0) {
-      if (g.shotEffect > 0) return "低下はゆっくり継続";
-      int daysLeft = max(1, ceil(g.shotCooldown / SHOT_COOLDOWN * 7));
-      return "次回投与まで あと" + daysLeft + "日";
-    }
-    return "スペースで注射";
+    if (g.lock > 0)       return "取り返すまで " + nf(g.lock, 1, 1) + " 秒";
+    if (g.shotEffect > 0) return "食べても血糖は上がらない  " + nf(g.shotEffect, 1, 1) + " 秒";
+    if (g.canShoot())     return "スペースで注射";
+    return "次のエリアまで打てません";
   }
 
   void drawFrame(float px, float py, int frameColor) {
@@ -75,28 +70,33 @@ class ShotPanel {
     fill(255);
     text(title(g), cx, py + 38);
 
-    textSize(13);
+    textSize(12);
     fill(255, 210);
     text(subtitle(g), cx, py + 60);
 
     textSize(11);
     fill(255, 150);
-    text("週1回しか打てない薬", cx, py + 103);
+    text("週1回しか打てない薬", cx, py + 105);
   }
 
-  // 投与間隔のゲージ。満タン = 打てる。
-  // 数字を読まなくても、溜まっていく様子で「あとどれくらい待つか」が分かる。
-  void drawIntervalBar(Game g, float px, float py, int frameColor) {
-    float bx = px + 16, by = py + 88;
-    float bw = PANEL_W - 32, bh = 10;
+  // エリアごとの使用権を、週の数だけ並べて見せる。
+  // 「あと何回打てるか」が数字を読まなくても分かる。
+  void drawWeekMarks(Game g, float px, float py, int frameColor) {
+    if (g.shotUsedInRegion == null) return;
 
-    float ratio = 1;
-    if (g.lock > 0)              ratio = 1 - g.lock / LOCK_DURATION;
-    else if (g.shotCooldown > 0) ratio = 1 - g.shotCooldown / SHOT_COOLDOWN;
+    int weeks = g.shotUsedInRegion.length;
+    float gap = 6;
+    float w = (PANEL_W - 32 - gap * (weeks - 1)) / weeks;
+    float y = py + 84;
 
-    fill(255, 40);
-    rect(bx, by, bw, bh, 5);
-    fill(frameColor);
-    rect(bx, by, bw * constrain(ratio, 0, 1), bh, 5);
+    for (int i = 0; i < weeks; i++) {
+      float x = px + 16 + i * (w + gap);
+
+      if (g.shotUsedInRegion[i])   fill(255, 45);      // 使用済み
+      else if (i == g.regionIndex) fill(frameColor);   // 今週。打てる
+      else                         fill(255, 110);     // まだ先の週
+
+      rect(x, y, w, 8, 4);
+    }
   }
 }

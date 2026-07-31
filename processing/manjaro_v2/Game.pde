@@ -37,10 +37,10 @@ class Game {
   int collapseCount = 0;        // 倒れた回数(成績に出す)
 
   // ---- マンジャロ ----
-  float shotCooldown = 0;       // 次に打てるまでの残り(=投与間隔)
-  float shotEffect = 0;         // 薬が効いている残り。この間は食べても血糖が上がらない
+  // 1エリア(=1週間)につき1回だけ打てる。打ったエリアを覚えておく。
+  boolean[] shotUsedInRegion;
+  float shotEffect = 0;         // 薬が効いている残り。この間は食べ物が無効になる
   float lock = 0;               // 女性に奪われて打てない残り
-  boolean foodBlocked = false;  // 直近の食べ物が効果で吸収されなかったか(表示用)
 
   // ---- ゾーン ----
   float zoneGauge = 0;          // 0〜100
@@ -57,8 +57,6 @@ class Game {
 
   // ---- 記録 ----
   int shotCount = 0;            // マンジャロを打った回数
-  int clearedCount = 0;         // 消した食べ物の総数
-  int lastCleared = 0;          // 直近1回で消した数
   int robbedCount = 0;          // 奪われた回数
   float zoneTotal = 0;          // ゾーンの合計時間
   float bestTime = 0;           // ベストタイム。0 なら記録なし
@@ -73,42 +71,39 @@ class Game {
     z = 0;  lane = 1;  x = laneToX(1);  elapsed = 0;
     glucose = 50;  hyperTimer = 0;
     collapse = 0;  collapseReason = "";  collapseCount = 0;
-    shotCooldown = 0;  shotEffect = 0;  lock = 0;  foodBlocked = false;
+    shotUsedInRegion = new boolean[regions.length];   // エリアごとの使用権をリセット
+    shotEffect = 0;  lock = 0;
     zoneGauge = 0;  zoneActive = 0;  zoneReady = false;
     shotFlash = 0;  foodPop = 0;
     regionIndex = 0;
     regionBanner = REGION_BANNER_SEC;   // 出発地(沖縄)の名前を最初に出す
-    shotCount = 0;  clearedCount = 0;  lastCleared = 0;
-    robbedCount = 0;  zoneTotal = 0;  newRecord = false;
+    shotCount = 0;  robbedCount = 0;  zoneTotal = 0;  newRecord = false;
     course.build();
   }
 
   void moveLeft()  { if (state == STATE_RUNNING) lane = max(0, lane - 1); }
   void moveRight() { if (state == STATE_RUNNING) lane = min(2, lane + 1); }
 
-  // マンジャロ = 目の前の食べ物をまとめて消す。
-  // 消せば血糖は上がらないが、そのぶん下がり続けるので低血糖に近づく。
-  // 打てるのは SHOT_COOLDOWN 秒に1回だけ(現実の週1回投与の再現)。
-  void tryShot() {
-    if (state != STATE_RUNNING) return;
-    if (lock > 0 || shotCooldown > 0) return;   // 奪われ中・投与間隔中は不発
+  // いま打てるか。1エリアにつき1回だけ。
+  boolean canShoot() {
+    if (state != STATE_RUNNING) return false;
+    if (lock > 0) return false;                       // 女性に奪われている
+    if (shotUsedInRegion == null) return false;
+    return !shotUsedInRegion[regionIndex];            // このエリアで未使用なら打てる
+  }
 
-    shotCooldown = SHOT_COOLDOWN;
+  // マンジャロ = 食べ物を無効にする。
+  //
+  // 食べ物を「消す」のではない。そこに残ったまま、食べたいと思わなくなる。
+  // 血糖にも直接影響しない。上がらなくなるだけ。
+  // だから効果中は血糖が下がる一方で、早く打ちすぎると低血糖に落ちる。
+  void tryShot() {
+    if (!canShoot()) return;
+
+    shotUsedInRegion[regionIndex] = true;   // このエリアの分を使い切った
     shotEffect = SHOT_EFFECT_SEC;
     shotFlash = 0.35;
     shotCount++;
-
-    // 消す範囲は「距離」ではなく「走行速度×秒数」。
-    // 距離で固定すると、速度が3倍変わる終盤で効果がまるで別物になってしまう。
-    float range = runSpeed() * SHOT_CLEAR_SEC;
-    int cleared = 0;
-    for (Food f : course.foods) {
-      if (f.eaten || f.z < z || f.z - z > range) continue;
-      f.eaten = true;
-      cleared++;
-    }
-    clearedCount += cleared;
-    lastCleared = cleared;
   }
 
   // ゾーンは満タンになっても勝手には発動しない。切るタイミングは自分で決める。
@@ -173,7 +168,6 @@ class Game {
   void updateTimers(float dt) {
     elapsed      += dt;
     collapse      = max(0, collapse - dt);
-    shotCooldown  = max(0, shotCooldown - dt);
     shotEffect    = max(0, shotEffect - dt);
     shotFlash     = max(0, shotFlash - dt);
     lock          = max(0, lock - dt);
@@ -246,13 +240,16 @@ class Game {
 
   // ---- 食べ物 ----
   // ゾーン中もすり抜けない。速度1.8倍で食べ物地帯に突っ込むと血糖が急騰する。
+  //
+  // マンジャロの効果中は、食べ物にまったく反応しない。
+  // 消費もされないので、その場に残ったまま素通りする(食欲が失せた状態)。
   void checkFoodPickup() {
+    if (shotEffect > 0) return;
+
     for (Food f : course.foods) {
       if (f.eaten || !isTouching(f.z, f.lane)) continue;
       f.eaten = true;
-      // 効果中は食べても吸収されない = 血糖が上がらない。これが薬の作用そのもの。
-      foodBlocked = (shotEffect > 0);
-      if (!foodBlocked) glucose += FOOD_GAIN;
+      glucose += FOOD_GAIN;
       foodPop = FOOD_POP_SEC;
     }
   }

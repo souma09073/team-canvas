@@ -28,7 +28,8 @@ final color C_EAST_SEA     = #3A6E8F;   //         灰青
 final color C_HOKKAIDO_LAND = #A8B8A4;  // 北海道:雪混じりの色
 final color C_HOKKAIDO_SEA  = #3E5F8A;  //         冷たい青
 
-final color C_FOOD       = #FF8C1A;   // 食べ物
+final color C_FOOD         = #FF8C1A;   // 食べ物
+final color C_FOOD_BLOCKED = #8A8A90;   // マンジャロが効いている間の食べ物(食欲が失せた状態)
 
 final color C_PLAYER_BODY = #33AA44;  // 主人公の服
 final color C_PLAYER_SKIN = #F0C090;  // 肌

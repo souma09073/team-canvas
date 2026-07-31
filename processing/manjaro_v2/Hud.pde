@@ -93,12 +93,12 @@ class Hud {
     fill(glucoseTextColor(g, gv));
     text(int(gv) + "", bx, by + bh + 6);
 
-    // 食べた瞬間、何が起きたかを言葉でも出す。
-    // マンジャロ効果中は「食べたのに上がらない」ことが分からないと薬の作用が伝わらない。
+    // 食べた瞬間、いくつ上がったかを言葉でも出す。
+    // (マンジャロ効果中は食べ物に反応しないので、ここには来ない)
     if (g.foodPop > 0) {
       setText(fontSmall, 14);
-      if (g.foodBlocked) { fill(C_BLOCKED); text("血糖上昇なし", bx + 44, by + bh + 12); }
-      else               { fill(C_NUM_FOOD);  text("+" + int(FOOD_GAIN), bx + 44, by + bh + 12); }
+      fill(C_NUM_FOOD);
+      text("+" + int(FOOD_GAIN), bx + 44, by + bh + 12);
     }
   }
 

@@ -147,8 +147,14 @@ class View3D {
   }
 
   // ---- 食べ物 ----
+  // ---- 食べ物 ----
+  // マンジャロが効いている間は灰色になる。「そこにあるのに、食べたいと思わない」の表現。
+  // 食べ物は消えず、素通りするだけなので、色でしか効いていることが分からない。
+  // だから、はっきり見分けがつく色にしてある。
   void drawFoods(Game g) {
     noStroke();
+    boolean blocked = (g.shotEffect > 0);
+
     for (Food f : g.course.foods) {
       if (f.eaten || !isVisible(f.z, g.z)) continue;
       float a = fadeAlpha(f.z - g.z);
@@ -156,7 +162,7 @@ class View3D {
 
       pushMatrix();
       translate(laneToX(f.lane), 1.0, f.z);
-      fill(C_FOOD, a);
+      fill(blocked ? C_FOOD_BLOCKED : C_FOOD, blocked ? a * 0.55 : a);
       sphere(0.8);
       popMatrix();
     }
