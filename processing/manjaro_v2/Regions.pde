@@ -30,6 +30,7 @@ class Region {
   float baseSpeed;     // 開始速度
   float rampMult;      // 終わりまでに何倍まで加速するか
   float targetSec;     // 無停止で走り抜けたときの目安タイム。ここから長さが決まる
+  float limitSec;      // その区間で到着しなければならない制限時間
 
   color land;          // 道の左側(陸)の色
   color sea;           // 道の右側(海)の色
@@ -62,7 +63,10 @@ class Region {
     this.startPort = startPort;  this.goalPort = goalPort;  return this;
   }
   Region speed(float baseSpeed, float rampMult, float targetSec) {
-    this.baseSpeed = baseSpeed;  this.rampMult = rampMult;  this.targetSec = targetSec;  return this;
+    this.baseSpeed = baseSpeed;  this.rampMult = rampMult;  this.targetSec = targetSec;  this.limitSec = targetSec;  return this;
+  }
+  Region limit(float limitSec) {
+    this.limitSec = limitSec;  return this;
   }
   Region look(color land, color sea, String foodImage, String skyImage) {
     this.land = land;  this.sea = sea;
@@ -139,12 +143,14 @@ void buildRegions() {
     region("沖縄")
       .ports("沖縄 糸満", "那覇港")
       .speed(95, 1.5, 25)
+      .limit(30)
       .look(C_OKINAWA_LAND, C_OKINAWA_SEA, "food_okinawa.png", "sky_okinawa.png")
       .food(0.50, 0.80, 16, 8),                 // 導入。密集なし
 
     region("本州 西日本")
       .ports("鹿児島港", "大阪港")
       .speed(115, 1.5, 25)
+      .limit(30)
       .look(C_WEST_LAND, C_WEST_SEA, "food_west.png", "sky_west.png")
       .food(0.42, 0.66, 20, 10)                 // 少し多め。まだ密集なし
       .rest(),                                  // ← 中間地点。ここだけ止まる
@@ -152,6 +158,7 @@ void buildRegions() {
     region("本州 東日本")
       .ports("名古屋港", "仙台港")
       .speed(135, 1.5, 25)
+      .limit(30)
       .look(C_EAST_LAND, C_EAST_SEA, "food_east.png", "sky_east.png")
       .food(0.38, 0.58, 24, 12)
       .dense(0.45, 0.62),                       // 密集地帯がひとつ
@@ -159,6 +166,7 @@ void buildRegions() {
     region("北海道")
       .ports("苫小牧港", "宗谷岬")
       .speed(160, 1.5, 25)
+      .limit(30)
       .look(C_HOKKAIDO_LAND, C_HOKKAIDO_SEA, "food_hokkaido.png", "sky_hokkaido.png")
       .food(0.32, 0.50, 28, 14)
       .dense(0.38, 0.66)                        // 密集地帯が長い

@@ -22,6 +22,7 @@ final int STATE_COUNTDOWN = 2;   // 3・2・1。世界は見えているが動�
 final int STATE_RUNNING   = 3;   // 走行中
 final int STATE_FERRY     = 4;   // フェリーで移動中
 final int STATE_GOAL      = 5;   // ゴールした
+final int STATE_GAME_OVER = 6;   // 区間の制限時間を超えた
 
 class Game {
   Course course = new Course();
@@ -73,6 +74,8 @@ class Game {
   int ferryFromRegion = 0;      // どのエリアを走り終えたか
   float stageStartTime = 0;     // そのエリアに入った時刻(区間タイムを出すため)
   int stageFoodCount = 0;       // そのエリアで食べた数
+  int checkpointRegionIndex = 0;  // R で戻す区間の開始地点
+  float checkpointElapsed = 0;    // そのチェックポイントでの経過時間
 
   // ---- 演出用のタイマー(ルールには影響しない) ----
   float shotFlash = 0;          // 打った瞬間の表示
@@ -91,6 +94,7 @@ class Game {
 
   void reset() {
     z = 0;  lane = 1;  x = laneToX(1);  elapsed = 0;
+    checkpointRegionIndex = 0;  checkpointElapsed = 0;
     hyperTimer = 0;
     stopTimer = 0;  stopReason = "";  stopIsCollapse = false;
     collapseCount = 0;  rockHitCount = 0;
@@ -110,6 +114,8 @@ class Game {
   // タイトルからも、フェリーからも、必ずここを通る。
   // 血糖を整えるのもここ(港で食事をとった、という扱い)。
   void startCountdown() {
+    checkpointRegionIndex = regionIndex;
+    checkpointElapsed = elapsed;
     state = STATE_COUNTDOWN;
     countdownTimer = COUNTDOWN_SEC;
     glucose = GLUCOSE_RESET;
@@ -191,6 +197,7 @@ class Game {
     checkHyperglycemia(dt);   // 高血糖のカウントダウン
     checkHypoglycemia();      // 低血糖
     checkGoal();              // ゴール判定
+    checkRegionTimeLimit();  // 区間の制限時間を超えたらゲームオーバー
   }
 
   // ---- カウントダウン ----
@@ -433,6 +440,56 @@ class Game {
     if (z >= COURSE_LENGTH) goal();
   }
 
+  void checkRegionTimeLimit() {
+    if (state != STATE_RUNNING) return;
+    if (regions == null || regionIndex < 0 || regionIndex >= regions.length) return;
+    if (stageTime() > regions[regionIndex].limitSec) gameOver();
+  }
+
+  void restartFromCheckpoint() {
+    if (regions == null || regions.length == 0) { reset(); return; }
+
+    if (checkpointRegionIndex < 0 || checkpointRegionIndex >= regions.length) {
+      checkpointRegionIndex = 0;
+    }
+
+    z = regions[checkpointRegionIndex].startZ;
+    regionIndex = checkpointRegionIndex;
+    lane = 1;
+    x = laneToX(1);
+    elapsed = checkpointElapsed;
+
+    hyperTimer = 0;
+    stopTimer = 0;  stopReason = "";  stopIsCollapse = false;
+    collapseCount = 0;  rockHitCount = 0;
+
+    if (shotUsedInRegion == null) {
+      shotUsedInRegion = new boolean[regions.length];
+    } else {
+      boolean[] next = new boolean[regions.length];
+      for (int i = 0; i < checkpointRegionIndex; i++) {
+        next[i] = shotUsedInRegion[i];
+      }
+      shotUsedInRegion = next;
+    }
+
+    shotEffect = 0;  lock = 0;
+    zoneGauge = 0;  zoneActive = 0;  zoneReady = false;
+    shotFlash = 0;  foodPop = 0;
+    regionBanner = 0;
+    ferryFromRegion = checkpointRegionIndex;
+    stageStartTime = elapsed;
+    stageFoodCount = 0;
+    countdownTimer = COUNTDOWN_SEC;
+    glucose = GLUCOSE_RESET;
+    state = STATE_COUNTDOWN;
+    newRecord = false;
+  }
+
+  void gameOver() {
+    state = STATE_GAME_OVER;
+  }
+
   // ============================================================
   // 終了処理
   // ============================================================
@@ -461,6 +518,11 @@ class Game {
       total += regions[i].secondsFrom(i == regionIndex ? z : regions[i].startZ);
     }
     return total;
+  }
+
+  float sectionTimeLimitRemaining() {
+    if (regions == null || regionIndex < 0 || regionIndex >= regions.length) return 0;
+    return max(0, regions[regionIndex].limitSec - stageTime());
   }
 
   // ---- ハイスコア ----

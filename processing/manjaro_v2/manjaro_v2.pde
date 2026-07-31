@@ -111,17 +111,23 @@ void keyPressed() {
     if (key == ENTER || key == RETURN) game.reset();
     return;
   }
+
+  if (game.state == STATE_GAME_OVER) {
+    if (key == 'r' || key == 'R') game.restartFromCheckpoint();
+    return;
+  }
+
   // フェリーは、中間地点の回だけ Enter を待つ。
   // 自動で流れる回は入力を受けない(押しても飛ばせない)。
   if (game.state == STATE_FERRY) {
     if ((key == ENTER || key == RETURN) && game.ferryIsRest()) game.leaveFerry();
-    if (key == 'r' || key == 'R') game.reset();
+    if (key == 'r' || key == 'R') game.restartFromCheckpoint();
     return;
   }
 
   // カウントダウン中はレーンだけ動かせる。構える時間なので。
   if (game.state == STATE_COUNTDOWN) {
-    if (key == 'r' || key == 'R') game.reset();
+    if (key == 'r' || key == 'R') game.restartFromCheckpoint();
     return;
   }
   if (keyCode == LEFT || key == 'a' || key == 'A') {
@@ -133,7 +139,7 @@ void keyPressed() {
   } else if (key == 'z' || key == 'Z') {
     game.tryZone();
   } else if (key == 'r' || key == 'R') {
-    game.reset();
+    game.restartFromCheckpoint();
   }
 }
 

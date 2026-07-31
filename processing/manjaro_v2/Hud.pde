@@ -213,12 +213,12 @@ class Hud {
     setText(fontBig, 30);
     textAlign(CENTER, TOP);
     fill(255);
-    text(nf(g.elapsed, 1, 2), SCREEN_W * 0.5, 16);
+    float remaining = max(0, g.sectionTimeLimitRemaining());
+    text("区間残り " + nf(remaining, 1, 2) + " 秒", SCREEN_W * 0.5, 16);
 
     setText(fontSmall, 13);
     fill(255, 220);
-    String sub = "ゴールまで 約" + int(g.secondsToGoal()) + "秒";
-    sub += g.bestTime > 0 ? "　ベスト " + nf(g.bestTime, 1, 2) + "秒" : "　ベスト --";
+    String sub = g.bestTime > 0 ? "ベスト " + nf(g.bestTime, 1, 2) + "秒" : "ベスト --";
     text(sub, SCREEN_W * 0.5, 56);
   }
 

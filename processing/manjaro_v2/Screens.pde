@@ -20,6 +20,7 @@ class Screens {
     else if (g.state == STATE_READY) { dim(); drawReady(); }
     else if (g.state == STATE_FERRY) { drawFerry(g); }        // 海の背景で覆うので dim は不要
     else if (g.state == STATE_GOAL)  { dim(); drawGoal(g); }
+    else if (g.state == STATE_GAME_OVER) { dim(); drawGameOver(g); }
   }
 
   // 3Dの世界を暗く沈めて、文字を読みやすくする
@@ -208,6 +209,21 @@ class Screens {
     setText(fontMid, 20);
     fill(255, 220);
     text(regions[g.regionIndex].name, SCREEN_W * 0.5, SCREEN_H * 0.56);
+  }
+
+  void drawGameOver(Game g) {
+    setText(fontBig, 34);
+    fill(255, 90, 90);
+    text("区間制限時間超過", SCREEN_W * 0.5, 160);
+
+    setText(fontMid, 24);
+    fill(255, 230);
+    String regionName = (g.regionIndex >= 0 && g.regionIndex < regions.length) ? regions[g.regionIndex].name : "区間";
+    text(regionName + "で制限時間 " + nf(regions[g.regionIndex].limitSec, 1, 1) + " 秒を超えました", SCREEN_W * 0.5, 235);
+
+    setText(fontSmall, 16);
+    fill(255, 200);
+    text("R キーでチェックポイントからやり直し", SCREEN_W * 0.5, 320);
   }
 
   void drawGoal(Game g) {
