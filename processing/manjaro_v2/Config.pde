@@ -4,8 +4,8 @@
 // 変えたら Run し直すだけで反映される。
 //
 // ┌─ よく使う早見表 ────────────────────────────────┐
-// │ コースを短くしたい      → COURSE_LENGTH_SEC を下げる       │
-// │ 速くしたい              → BASE_SPEED / RAMP_END_MULT       │
+// │ 全体を速く / 遅く       → SPEED_SCALE(下にある。これ1つ) │
+// │ コースを短くしたい      → Regions.pde の targetSec を下げる │
 // │ メーターの動きを穏やかに→ FOOD_GAIN と DRAIN_PER_SEC を    │
 // │                           同じ倍率で下げる                 │
 // │ 低血糖で死にやすく      → DRAIN_PER_SEC を上げる           │
@@ -108,11 +108,22 @@ final float ZONE_SPEED_MULT     = 1.8;   // 発動中の速度倍率
 // ゾーンの効果は「加速」と「女性すり抜け」だけ。食べ物はすり抜けず血糖も普通に動く
 
 // ---- 速度とコース ----
-final float COURSE_LENGTH_SEC = 55;    // 想定プレイ時間(70→55 間延びしていた中盤以降を圧縮)
-final float BASE_SPEED        = 70;    // 序盤の速度(units/秒)
-final float RAMP_END_MULT     = 2.8;   // ゴール時の倍率(終速 196 units/秒)
+// エリアごとの速度は Regions.pde の buildRegions() にある。
+// エリアが進むほど速くなり、フェリーに着くたび開始速度へ戻る。
+// 各エリアの長さは「目標秒数 ÷ 速度」から自動計算されるので、ここには書かない。
+
+// ★ 全体の速さを変えるならここだけ触る。1.0 が基準。
+//   上げるとコースも自動で長くなるので、各エリアのタイムは25秒のまま変わらない。
+//   「全体的にもっと速く」と思ったら、この数字を 1.2 → 1.4 → 1.6 と振ってみること。
+//   レーン移動の速さも一緒に上がるので、操作が置いていかれることはない。
+final float SPEED_SCALE = 1.3;
+
 final float LANE_WIDTH        = 4;
-final float LANE_CHANGE_SPEED = 18;    // レーン移動の速さ(units/秒)
+final float LANE_CHANGE_BASE  = 24;    // レーン移動の速さの基準値(units/秒)
+
+// 実際のレーン移動の速さ。走行速度と一緒に上がる。
+// 速度だけ上げると「見えているのに届かない」状態になるため、必ず連動させる。
+float laneChangeSpeed() { return LANE_CHANGE_BASE * SPEED_SCALE; }
 final float COLLECT_DIST      = 2.0;   // 当たり判定(前後方向)
 
 // ---- 食べ物の配置 ----
@@ -183,14 +194,8 @@ final float MINI_GAUGE_H = 150;      // 設計座標での高さ
 // 実際に動かさないと分からない。実機で確認した結果 +1 が正しかった(-1 だと左右が逆になる)。
 final float LANE_X_SIGN = 1;
 
-// コース長は「想定プレイ時間 × 平均速度」で決める
-final float COURSE_LENGTH = BASE_SPEED * COURSE_LENGTH_SEC * (1 + RAMP_END_MULT) / 2;
-
-// 地点 z における走行速度
-float speedAtZ(float z) {
-  float p = constrain(z / COURSE_LENGTH, 0, 1);
-  return BASE_SPEED * (1 + (RAMP_END_MULT - 1) * p);
-}
+// COURSE_LENGTH と speedAtZ() は Regions.pde にある。
+// どちらもエリアの構成から計算されるため。
 
 // レーン番号(0=左 1=中 2=右)を ワールドX に変換する
 float laneToX(int lane) {

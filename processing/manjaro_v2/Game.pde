@@ -257,7 +257,7 @@ class Game {
   void moveLane(float dt) {
     float targetX = laneToX(lane);
     float dx = targetX - x;
-    float step = LANE_CHANGE_SPEED * dt;
+    float step = laneChangeSpeed() * dt;
     x += (abs(dx) <= step) ? dx : (dx > 0 ? step : -step);
   }
 

@@ -61,7 +61,6 @@ void setup() {
   // ここがずれていたら、乱数か配置ロジックの移植を間違えている。
   println("--- コース照合 ---");
   println("コース長  " + int(COURSE_LENGTH) + " units   (期待 7315)");
-  println("速度      " + int(BASE_SPEED) + " -> " + int(BASE_SPEED * RAMP_END_MULT) + " units/s");
   println("食べ物    " + game.course.foods.size() + " 個   (期待 153)");
   println("女性      " + game.course.women.size() + " 体   (期待 7)");
   println("壁        z=" + int(game.course.wallStart) + "-" + int(game.course.wallEnd) + "   (期待 5917-6112)");

@@ -31,7 +31,7 @@ class View3D {
   // ============================================================
 
   void apply(Game g) {
-    float speedRatio = speedAtZ(g.z) / BASE_SPEED;   // 序盤1.0 → ゴール2.8
+    float speedRatio = speedAtZ(g.z) / baseSpeedRef();   // 序盤1.0 → ゴール2.8
 
     // 速度が上がるほど画角を広げる。視界の端が流れてスピード感が出る。
     float fov = FOV_BASE + (speedRatio - 1) * 10 + (g.zoneActive > 0 ? 12 : 0);
@@ -146,7 +146,6 @@ class View3D {
     }
   }
 
-  // ---- 食べ物 ----
   // ---- 食べ物 ----
   // マンジャロが効いている間は灰色になる。「そこにあるのに、食べたいと思わない」の表現。
   // 食べ物は消えず、素通りするだけなので、色でしか効いていることが分からない。
@@ -317,7 +316,7 @@ class View3D {
   // 画像があれば板に貼って描き、無ければ球と箱で描く。
   void drawPlayer(Game g) {
     // 走りの上下ゆれ。周期を走行速度に比例させないと、速いときに足が滑って見える。
-    float bobRate = 6 + 8 * (speedAtZ(g.z) / BASE_SPEED);
+    float bobRate = 6 + 8 * (speedAtZ(g.z) / baseSpeedRef());
     float bob = abs(sin(g.elapsed * bobRate)) * 0.18;
     float pop = max(0, g.foodPop / FOOD_POP_SEC);   // 食べた瞬間に一瞬ふくらむ
 
