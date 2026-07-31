@@ -1,6 +1,29 @@
 // ============================================================
-// 調整する数値は全部ここ。HTMLプロトタイプの CONFIG をそのまま移植している。
-// プロトと同じ数字にしてあるので、手触りはブラウザ版と一致する。
+// 調整する数値は全部ここ。
+// ゲームバランスを変えたいときは、このファイルだけ触ればいい。
+// 変えたら Run し直すだけで反映される。
+//
+// ┌─ よく使う早見表 ────────────────────────────────┐
+// │ コースを短くしたい      → COURSE_LENGTH_SEC を下げる       │
+// │ 速くしたい              → BASE_SPEED / RAMP_END_MULT       │
+// │ メーターの動きを穏やかに→ FOOD_GAIN と DRAIN_PER_SEC を    │
+// │                           同じ倍率で下げる                 │
+// │ 低血糖で死にやすく      → DRAIN_PER_SEC を上げる           │
+// │ 高血糖で死にやすく      → DRAIN_PER_SEC_HIGH を下げる      │
+// │ 全体を易しく            → HYPER_GRACE_SEC を上げる         │
+// │ 食べ物を減らしたい      → SPARSE_GAP_MIN / MAX を上げる    │
+// └────────────────────────────────────────────────┘
+//
+// 【注意1】FOOD_GAIN と DRAIN_PER_SEC はセットで考える。
+//   必要ペース = FOOD_GAIN ÷ DRAIN_PER_SEC 秒に1個(今は 20÷10 = 2.0秒)。
+//   両方を同じ倍率で変えれば、忙しさを変えずに跳ね方だけ調整できる。
+//
+// 【注意2】STABLE_MAX を変えるときは、HYPER_THRESHOLD と HYPER_RESET_BELOW も
+//   同じ数字にする(3ヶ所セット)。
+//
+// 【注意3】高血糖で死ぬ条件:
+//   (100 - STABLE_MAX) ÷ DRAIN_PER_SEC_HIGH が HYPER_GRACE_SEC を超えると
+//   「振り切ったら確定死」になる。今は 35÷15 = 2.33秒 対 3秒 で、余裕0.67秒。
 // ============================================================
 
 // ---- 画面 ----
@@ -31,6 +54,8 @@ final float LOCK_DURATION   = 7;     // 女性に接触したとき撃てなく�
 
 // ---- ゾーン ----
 final float ZONE_CHARGE_PER_SEC = 8;     // 緑の帯に居る間の蓄積(%/秒)
+final float ZONE_DECAY_PER_SEC  = 0;     // 帯を外れた時の減少(%/秒)。0=貯金は消えない
+final float FOOD_POP_SEC        = 0.5;   // 食べた演出の長さ(秒)
 final float ZONE_DURATION       = 1.5;   // 発動時間(秒)
 final float ZONE_SPEED_MULT     = 1.8;   // 発動中の速度倍率
 // ゾーンの効果は「加速」と「女性すり抜け」だけ。食べ物はすり抜けず血糖も普通に動く
@@ -78,6 +103,13 @@ final float CAM_BACK   = 11;   // 主人公の後ろへの距離
 final float CAM_LOOK_Y = 1.5;  // 注視点の高さ
 final float CAM_LOOK_AHEAD = 12;
 final float FOV_BASE = 60;     // 画角(度)。速度が上がるほど広がる
+
+// 主人公の右横に追従する縦向きの血糖バー(下=0 上=100)。
+// 左上のメーターから目を離さずに済むよう、視線の近くにもう1つ置いている。
+final float MINI_GAUGE_SIDE = 2.4;   // 主人公から右へ何units離すか
+final float MINI_GAUGE_BODY_Y = 1.6; // 体のどの高さに合わせるか
+final float MINI_GAUGE_W = 14;       // 設計座標での幅
+final float MINI_GAUGE_H = 150;      // 設計座標での高さ
 
 // 画面の左右とワールドのX符号の対応。
 // camera() の up ベクトルを (0,-1,0) にしている都合で、+X が画面のどちら側に出るかは

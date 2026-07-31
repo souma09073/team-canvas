@@ -1,38 +1,70 @@
 // ============================================================
-// 3D描画。プロトタイプ(Three.js)と同じカメラ・同じ座標系にしてある。
-//   ・主人公は原点(x, 0, z)、進行方向は +Z
-//   ・カメラは真後ろ上空 (x, CAM_HEIGHT, z - CAM_BACK)
-//   ・+Y を上にするため、camera() の up ベクトルを (0,-1,0) にしている
-//     (Processing の 3D は既定で +Y が下向きのため)
-// 手計算の遠近は一切していない。物を置けば奥行きは自動で付く。
+// 3D描画。
+//
+// 【要点】遠近感の計算は一切していない。
+// カメラを主人公の後ろに置き、物を (横, 高さ, 前後) の座標に置くだけ。
+// 遠くのものが小さく見えるのは Processing が勝手にやってくれる。
+//
+// 座標の決まり:
+//   X … 横。+が画面の右
+//   Y … 高さ。+が上(camera() の up を (0,-1,0) にして上向きに揃えている)
+//   Z … 前後。+が進行方向
+//
+// 3Dモデルは1つも使っていない。球(sphere)と箱(box)だけで作っている。
 // ============================================================
 
 class View3D {
 
-  void apply(Game g) {
-    float vm = speedAtZ(g.z) / BASE_SPEED;
+  // ミニ血糖バーを出す画面座標(実ウィンドウのピクセル)。
+  // screenX()/screenY() は 3Dのカメラが有効な間しか正しい値を返さないので、
+  // HUD が camera() でリセットする前に計算して覚えておく。
+  float miniSX = 0, miniSY = 0;
 
-    // 速度が上がるほど画角を広げてスピード感を出す(プロトと同じ演出)
-    float fov = FOV_BASE + (vm - 1) * 10 + (g.zoneActive > 0 ? 12 : 0);
+  void computeMiniGaugePos(Game g) {
+    float wx = g.x + MINI_GAUGE_SIDE;
+    miniSX = screenX(wx, MINI_GAUGE_BODY_Y, g.z);
+    miniSY = screenY(wx, MINI_GAUGE_BODY_Y, g.z);
+  }
+
+  // ============================================================
+  // カメラと光
+  // ============================================================
+
+  void apply(Game g) {
+    float speedRatio = speedAtZ(g.z) / BASE_SPEED;   // 序盤1.0 → ゴール2.8
+
+    // 速度が上がるほど画角を広げる。視界の端が流れてスピード感が出る。
+    float fov = FOV_BASE + (speedRatio - 1) * 10 + (g.zoneActive > 0 ? 12 : 0);
     perspective(radians(fov), float(width) / float(height), 1, DRAW_DIST * 1.6);
 
+    // 主人公の真後ろ上空から、少し前方を見る
     camera(
-      g.x, CAM_HEIGHT, g.z - CAM_BACK,
-      g.x, CAM_LOOK_Y, g.z + CAM_LOOK_AHEAD,
-      0, -1, 0
+      g.x, CAM_HEIGHT, g.z - CAM_BACK,          // カメラの位置
+      g.x, CAM_LOOK_Y, g.z + CAM_LOOK_AHEAD,    // 見る先
+      0, -1, 0                                  // 上の向き(+Yを上にするため)
     );
 
     ambientLight(150, 150, 155);
     directionalLight(120, 120, 115, -0.3, 0.8, 0.5);
   }
 
-  // 遠くのものを薄くする。P3Dにはフォグが無いので、これが無いと
-  // 描画限界でいきなり物が現れて反応できない。
-  float fadeAlpha(float dz) {
-    if (dz > DRAW_DIST) return 0;
-    if (dz < DRAW_DIST - FADE_DIST) return 255;
-    return map(dz, DRAW_DIST - FADE_DIST, DRAW_DIST, 255, 0);
+  // 遠くのものを薄くする。
+  // P3D には霧(フォグ)が無いので、これが無いと描画限界でいきなり物が現れる。
+  float fadeAlpha(float distance) {
+    if (distance > DRAW_DIST) return 0;
+    if (distance < DRAW_DIST - FADE_DIST) return 255;
+    return map(distance, DRAW_DIST - FADE_DIST, DRAW_DIST, 255, 0);
   }
+
+  // 描く必要があるか。手前を過ぎたもの、遠すぎるものは描かない。
+  boolean isVisible(float objZ, float playerZ) {
+    float d = objZ - playerZ;
+    return d >= -5 && d <= DRAW_DIST;
+  }
+
+  // ============================================================
+  // 世界を描く。手前に来るものほど後に描く必要はない(3Dが奥行きを判定する)。
+  // ============================================================
 
   void drawWorld(Game g) {
     drawGround(g);
@@ -44,143 +76,155 @@ class View3D {
     drawPlayer(g);
   }
 
+  // ---- 地面 ----
+  // 主人公の周りだけを板で描く。コース全体を描くと無駄が大きい。
   void drawGround(Game g) {
     float half = LANE_WIDTH * 1.5 + 1;
-    float z0 = g.z - CAM_BACK - 10;
-    float z1 = g.z + DRAW_DIST;
+    float zNear = g.z - CAM_BACK - 10;
+    float zFar  = g.z + DRAW_DIST;
 
     noStroke();
-    // 道路
-    fill(85, 85, 95);
-    beginShape(QUADS);
-    vertex(-half, 0, z0); vertex(half, 0, z0);
-    vertex(half, 0, z1);  vertex(-half, 0, z1);
-    endShape();
+    fill(C_ROAD);
+    flatQuad(-half, half, zNear, zFar, 0);
 
-    // 左右の路肩。左=緑地、右=海
-    fill(63, 155, 79);
-    beginShape(QUADS);
-    vertex(-half - 60, -0.02, z0); vertex(-half, -0.02, z0);
-    vertex(-half, -0.02, z1);      vertex(-half - 60, -0.02, z1);
-    endShape();
+    fill(C_GRASS);
+    flatQuad(-half - 60, -half, zNear, zFar, -0.02);   // わずかに下げて道路と重ならないように
 
-    fill(46, 134, 171);
+    fill(C_SEA);
+    flatQuad(half, half + 60, zNear, zFar, -0.02);
+  }
+
+  // 地面に平らな四角を1枚置く
+  void flatQuad(float x1, float x2, float z1, float z2, float y) {
     beginShape(QUADS);
-    vertex(half, -0.02, z0);      vertex(half + 60, -0.02, z0);
-    vertex(half + 60, -0.02, z1); vertex(half, -0.02, z1);
+    vertex(x1, y, z1);
+    vertex(x2, y, z1);
+    vertex(x2, y, z2);
+    vertex(x1, y, z2);
     endShape();
   }
 
-  // レーンの区切り線。手前から DRAW_DIST までの分だけ描く。
+  // ---- レーンの区切り線 ----
+  // 白線が手前へ流れることで、止まっていないことが伝わる。
   void drawLaneLines(Game g) {
     noStroke();
-    float step = 8;
-    float startZ = floor((g.z - 20) / step) * step;
+    float spacing = 8;
+    float startZ = floor((g.z - 20) / spacing) * spacing;
+
     for (float lx = -LANE_WIDTH * 0.5; lx <= LANE_WIDTH * 0.5 + 0.01; lx += LANE_WIDTH) {
-      for (float lz = startZ; lz < g.z + DRAW_DIST; lz += step) {
+      for (float lz = startZ; lz < g.z + DRAW_DIST; lz += spacing) {
         float a = fadeAlpha(lz - g.z);
         if (a <= 0) continue;
-        fill(255, a);
+        fill(C_LANE_LINE, a);
         beginShape(QUADS);
-        vertex(lx - 0.12, 0.01, lz);     vertex(lx + 0.12, 0.01, lz);
-        vertex(lx + 0.12, 0.01, lz + 4); vertex(lx - 0.12, 0.01, lz + 4);
+        vertex(lx - 0.12, 0.01, lz);
+        vertex(lx + 0.12, 0.01, lz);
+        vertex(lx + 0.12, 0.01, lz + 4);
+        vertex(lx - 0.12, 0.01, lz + 4);
         endShape();
       }
     }
   }
 
+  // ---- 食べ物 ----
   void drawFoods(Game g) {
     noStroke();
     for (Food f : g.course.foods) {
-      if (f.eaten) continue;
-      float dz = f.z - g.z;
-      if (dz < -5 || dz > DRAW_DIST) continue;
-      float a = fadeAlpha(dz);
+      if (f.eaten || !isVisible(f.z, g.z)) continue;
+      float a = fadeAlpha(f.z - g.z);
       if (a <= 0) continue;
 
       pushMatrix();
       translate(laneToX(f.lane), 1.0, f.z);
-      fill(255, 140, 26, a);
+      fill(C_FOOD, a);
       sphere(0.8);
       popMatrix();
     }
   }
 
-  // 女性キャラ。地面の下に隠れていて、直前になるとせり上がる。
+  // ---- 女性キャラ ----
+  // 普段は地面の下に隠れていて、直前になるとせり上がってくる。
   void drawWomen(Game g) {
     noStroke();
     for (Woman w : g.course.women) {
-      float dz = w.z - g.z;
-      if (dz < -5 || dz > DRAW_DIST) continue;
-      float a = fadeAlpha(dz);
+      if (w.revealT <= 0 || !isVisible(w.z, g.z)) continue;   // まだ地中なら描かない
+      float a = fadeAlpha(w.z - g.z);
       if (a <= 0) continue;
 
-      // 最後に減速するイージングで「ズドン」と出る感じにする
-      float e = 1 - pow(1 - w.revealT, 3);
-      float y = WOMAN_HIDE_Y * (1 - e);
-      if (w.revealT <= 0) continue;   // まだ地中。描かない
+      // 最後に減速するイージング。「ズドン」と出る感じになる
+      float ease = 1 - pow(1 - w.revealT, 3);
+      float y = WOMAN_HIDE_Y * (1 - ease);
 
       pushMatrix();
       translate(laneToX(w.lane), y, w.z);
-      if (w.hit) fill(136, 68, 102, a); else fill(221, 34, 85, a);
+
+      fill(w.hit ? C_WOMAN_HIT : C_WOMAN, a);
       pushMatrix();
       translate(0, 1.0, 0);
       box(1.3, 2.0, 1.0);
       popMatrix();
-      fill(240, 192, 144, a);
+
+      fill(C_PLAYER_SKIN, a);
       pushMatrix();
       translate(0, 2.35, 0);
       sphere(0.45);
       popMatrix();
+
       popMatrix();
     }
   }
 
-  // 壁の予告看板。見えてから撃つのでは間に合わないので、かなり手前に立っている。
+  // ---- 壁の予告看板 ----
+  // 壁が見えてから撃つのでは投与間隔が間に合わないので、かなり手前に立っている。
   void drawSigns(Game g) {
     noStroke();
     for (Sign s : g.course.signs) {
-      float dz = s.z - g.z;
-      if (dz < -5 || dz > DRAW_DIST) continue;
-      float a = fadeAlpha(dz);
+      if (!isVisible(s.z, g.z)) continue;
+      float a = fadeAlpha(s.z - g.z);
       if (a <= 0) continue;
 
-      float sx = s.side * (LANE_WIDTH * 1.5 + 2.5);
       pushMatrix();
-      translate(sx, 0, s.z);
-
-      fill(107, 107, 115, a);
-      pushMatrix();
-      translate(0, 2.75, 0);
-      box(0.4, 5.5, 0.4);
-      popMatrix();
-
-      fill(255, 204, 0, a);
-      pushMatrix();
-      translate(0, 6.2, 0);
-      box(6.2, 3.4, 0.3);
-      popMatrix();
-
-      // 3レーン全部ふさがっていることを絵で示す赤いブロック
-      fill(204, 34, 34, a);
-      for (int i = -1; i <= 1; i++) {
-        pushMatrix();
-        translate(i * 1.7, 6.2, -0.25);
-        box(1.3, 1.3, 0.12);
-        popMatrix();
-      }
+      translate(s.side * (LANE_WIDTH * 1.5 + 2.5), 0, s.z);
+      drawSignPost(a);
+      drawSignBoard(a);
       popMatrix();
     }
   }
 
+  void drawSignPost(float a) {
+    fill(C_SIGN_POST, a);
+    pushMatrix();
+    translate(0, 2.75, 0);
+    box(0.4, 5.5, 0.4);
+    popMatrix();
+  }
+
+  void drawSignBoard(float a) {
+    fill(C_SIGN_BOARD, a);
+    pushMatrix();
+    translate(0, 6.2, 0);
+    box(6.2, 3.4, 0.3);
+    popMatrix();
+
+    // 「3レーン全部ふさがっている」ことを絵で示す赤いブロック3つ。
+    // 板の手前側(-Z)に少し出して、正面から見えるようにしている。
+    fill(C_SIGN_MARK, a);
+    for (int i = -1; i <= 1; i++) {
+      pushMatrix();
+      translate(i * 1.7, 6.2, -0.25);
+      box(1.3, 1.3, 0.12);
+      popMatrix();
+    }
+  }
+
+  // ---- ゴールゲート ----
   void drawGoal(Game g) {
-    float dz = COURSE_LENGTH - g.z;
-    if (dz < -20 || dz > DRAW_DIST) return;
-    float a = fadeAlpha(dz);
+    if (!isVisible(COURSE_LENGTH, g.z) && COURSE_LENGTH - g.z > 0) return;
+    float a = fadeAlpha(COURSE_LENGTH - g.z);
     if (a <= 0) return;
 
     noStroke();
-    fill(255, 204, 0, a);
+    fill(C_GOAL, a);
     for (int side = -1; side <= 1; side += 2) {
       pushMatrix();
       translate(side * (LANE_WIDTH * 1.5 + 1), 4, COURSE_LENGTH);
@@ -193,7 +237,8 @@ class View3D {
     popMatrix();
   }
 
-  // 主人公。プロトと同じく、緑の胴体+頭+赤い帽子。
+  // ---- 主人公 ----
+  // 球(胴体)+ 球(頭)+ 箱(帽子)。3Dモデルは使っていない。
   void drawPlayer(Game g) {
     noStroke();
     pushMatrix();
@@ -203,26 +248,25 @@ class View3D {
     float bob = abs(sin(g.elapsed * bobRate)) * 0.18;
 
     // 食べた瞬間に一瞬ふくらむ
-    float pop = g.foodPop / 0.5;
-    float sx = 1 + max(0, pop) * 0.3;
+    float pop = max(0, g.foodPop / FOOD_POP_SEC);
 
     translate(g.x, bob, g.z);
-    scale(sx, 1 + max(0, pop) * 0.15, sx);
+    scale(1 + pop * 0.3, 1 + pop * 0.15, 1 + pop * 0.3);
 
-    fill(51, 170, 68);
+    fill(C_PLAYER_BODY);
     pushMatrix();
     translate(0, 1.1, 0);
-    scale(1, 1.15, 0.9);
+    scale(1, 1.15, 0.9);      // 縦長・薄めにして体型を出す
     sphere(1.0);
     popMatrix();
 
-    fill(240, 192, 144);
+    fill(C_PLAYER_SKIN);
     pushMatrix();
     translate(0, 2.45, 0);
     sphere(0.55);
     popMatrix();
 
-    fill(221, 51, 51);
+    fill(C_PLAYER_CAP);
     pushMatrix();
     translate(0, 2.75, 0);
     box(1.15, 0.35, 1.15);

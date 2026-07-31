@@ -1,11 +1,18 @@
 // ============================================================
-// HUD。1280x720 の設計座標で書き、実ウィンドウへ拡大縮小して表示する。
-// 3Dの上に重ねるので、奥行き判定を切ってカメラを既定へ戻してから描く。
+// 画面表示(HUD)。
+//
+// 描画は常に 1280x720 の座標で書き、実際のウィンドウの大きさに合わせて拡大縮小する。
+// こうしておかないと、解像度や表示倍率の違うPCでレイアウトが崩れる。
+//
+// 大きな部品は別ファイルに分けてある:
+//   ShotPanel.pde … 右下のマンジャロのパネル
+//   Screens.pde   … タイトル / ゲームオーバー / ゴールの全画面表示
+//   Fonts.pde     … フォントの読み込みと setText()
 // ============================================================
 
-float designScale = 1;
-float designOffsetX = 0;
-float designOffsetY = 0;
+float designScale = 1;      // 設計座標 -> 実ウィンドウ の倍率
+float designOffsetX = 0;    // 画面比が合わないぶんの余白(左右)
+float designOffsetY = 0;    // 同(上下)
 
 void computeDesignTransform() {
   designScale = min(width / float(SCREEN_W), height / float(SCREEN_H));
@@ -15,30 +22,28 @@ void computeDesignTransform() {
 }
 
 class Hud {
-  PFont fontBig, fontMid, fontSmall;
+  ShotPanel shotPanel = new ShotPanel();
+  Screens screens = new Screens();
 
-  void loadFonts() {
-    // 環境によって入っているフォントが違う。上から順に試す。
-    String[] candidates = { "Meiryo UI", "Meiryo", "Yu Gothic UI", "Yu Gothic", "MS Gothic", "MS PGothic" };
-    String found = null;
-    String[] installed = PFont.list();
-    for (String c : candidates) {
-      for (String s : installed) {
-        if (s.equalsIgnoreCase(c)) { found = c; break; }
-      }
-      if (found != null) break;
-    }
-    if (found == null) {
-      println("!! 日本語フォントが見つからない。文字が豆腐(□)になります。");
-      return;
-    }
-    println("使用フォント: " + found);
-    // サイズごとに作る。1つを縮小すると小さい文字が滲む。
-    fontBig   = createFont(found, 30);
-    fontMid   = createFont(found, 20);
-    fontSmall = createFont(found, 14);
+  void draw(Game g) {
+    begin();
+    noStroke();
+
+    drawProgress(g);
+    drawGlucose(g);
+    drawMiniGauge(g);
+    drawZone(g);
+    shotPanel.draw(g);
+    drawTime(g);
+    drawFinalHint(g);
+    drawWarnings(g);
+    screens.draw(g);
+
+    end();
   }
 
+  // 3Dの上に2Dを重ねるための準備。
+  // camera() が行列を戻すので、拡大縮小は必ずその後にかける。
   void begin() {
     hint(DISABLE_DEPTH_TEST);
     camera();
@@ -49,93 +54,137 @@ class Hud {
   }
 
   void end() {
-    hint(ENABLE_DEPTH_TEST);
-  }
-
-  void draw(Game g) {
-    begin();
-    noStroke();
-
-    drawProgress(g);
-    drawGlucose(g);
-    drawZone(g);
-    drawShot(g);
-    drawTime(g);
-    drawFinalHint(g);
-    drawWarnings(g);
-    drawOverlays(g);
-
-    end();
+    hint(ENABLE_DEPTH_TEST);   // 戻し忘れると次のフレームの3Dが壊れる
   }
 
   // ---- 画面最上部の進捗バー ----
   void drawProgress(Game g) {
     fill(0, 130);
     rect(0, 0, SCREEN_W, 7);
-    float p = constrain(g.z / COURSE_LENGTH, 0, 1);
     fill(80, 230, 150);
-    rect(0, 0, SCREEN_W * p, 7);
+    rect(0, 0, SCREEN_W * constrain(g.z / COURSE_LENGTH, 0, 1), 7);
   }
 
-  // ---- 血糖ゲージ ----
-  // 緑 = 安定域 = ゾーンが溜まる範囲。低血糖側は青、高血糖側は赤で分ける
-  // (同じ赤にすると、上に振り切ったのか下に振り切ったのか一瞬で判断できない)。
+  // ---- 左上の血糖ゲージ ----
+  // 緑 = 安定域 = ゾーンが溜まる範囲。この3つをわざと同じ範囲にして、
+  // 「緑にいる」の意味を1つに絞っている。
+  // 低血糖側は青、高血糖側は赤。同じ赤にすると、上に振り切ったのか
+  // 下に振り切ったのかが一瞬で判断できない。
   void drawGlucose(Game g) {
     float px = 24, py = 22, pw = 300, ph = 86;
     fill(0, 150);
     rect(px, py, pw, ph, 12);
 
-    if (fontSmall != null) textFont(fontSmall);
+    setText(fontSmall, 13);
     textAlign(LEFT, TOP);
     fill(255, 220);
-    textSize(13);
     text("血糖値", px + 14, py + 8);
 
     float bx = px + 14, by = py + 30, bw = pw - 28, bh = 18;
-    float d = DANGER_ZONE, sMin = STABLE_MIN, sMax = STABLE_MAX;
-    fill(16, 29, 140);  rect(bx,                       by, bw * (d * 0.35f / 100), bh);
-    fill(43, 92, 255);  rect(bx + bw * (d * 0.35f / 100), by, bw * ((d - d * 0.35f) / 100), bh);
-    fill(221, 204, 51); rect(bx + bw * (d / 100),      by, bw * ((sMin - d) / 100), bh);
-    fill(68, 255, 153); rect(bx + bw * (sMin / 100),   by, bw * ((sMax - sMin) / 100), bh);
-    fill(221, 51, 51);  rect(bx + bw * (sMax / 100),   by, bw * ((100 - sMax) / 100), bh);
+    drawGlucoseBands(bx, by, bw, bh);
 
-    // 針
     float gv = constrain(g.glucose, 0, 100);
     fill(255);
-    rect(bx + bw * (gv / 100) - 2, by - 3, 4, bh + 6);
+    rect(bx + bw * (gv / 100) - 2, by - 3, 4, bh + 6);   // 針
 
-    // 数字。低血糖=青 / 高血糖=赤 / 食べた瞬間=オレンジ
-    if (fontMid != null) textFont(fontMid);
-    textSize(22);
-    if (g.foodPop > 0)             fill(255, 176, 46);
-    else if (gv < DANGER_ZONE)     fill(91, 131, 255);
-    else if (g.hyperTimer > 0)     fill(255, 85, 85);
-    else                           fill(255);
+    setText(fontMid, 22);
+    fill(glucoseTextColor(g, gv));
     text(int(gv) + "", bx, by + bh + 6);
 
     // 食べた瞬間、何が起きたかを言葉でも出す。
-    // マンジャロ効果中は「食べたのに上がらない」ことが分からないと、薬の作用が伝わらない。
+    // マンジャロ効果中は「食べたのに上がらない」ことが分からないと薬の作用が伝わらない。
     if (g.foodPop > 0) {
-      if (fontSmall != null) textFont(fontSmall);
-      textSize(14);
-      if (g.foodBlocked) {
-        fill(120, 220, 255);
-        text("血糖上昇なし", bx + 44, by + bh + 12);
-      } else {
-        fill(255, 176, 46);
-        text("+" + int(FOOD_GAIN), bx + 44, by + bh + 12);
-      }
+      setText(fontSmall, 14);
+      if (g.foodBlocked) { fill(C_BLOCKED); text("血糖上昇なし", bx + 44, by + bh + 12); }
+      else               { fill(C_NUM_FOOD);  text("+" + int(FOOD_GAIN), bx + 44, by + bh + 12); }
     }
   }
 
+  // ゲージの色分け。横向きに 0〜100 を割り当てる。
+  void drawGlucoseBands(float bx, float by, float bw, float bh) {
+    band(bx, by, bw, bh, 0,                  DANGER_ZONE * 0.35f, C_GLU_CRITICAL);   // いよいよ危ない
+    band(bx, by, bw, bh, DANGER_ZONE * 0.35f, DANGER_ZONE,        C_GLU_LOW);   // 低血糖
+    band(bx, by, bw, bh, DANGER_ZONE,         STABLE_MIN,         C_GLU_MID);  // 中間
+    band(bx, by, bw, bh, STABLE_MIN,          STABLE_MAX,         C_GLU_STABLE);  // 安定=ゾーンが溜まる
+    band(bx, by, bw, bh, STABLE_MAX,          100,                C_GLU_HIGH);   // 高血糖
+  }
+
+  // 血糖 lo〜hi の範囲を横バーの該当位置に塗る
+  void band(float bx, float by, float bw, float bh, float lo, float hi, int c) {
+    fill(c);
+    rect(bx + bw * (lo / 100), by, bw * (hi - lo) / 100, bh);
+  }
+
+  // 数字の色。点滅を見なくても、上下どちらに振れているかが分かるようにする。
+  int glucoseTextColor(Game g, float gv) {
+    if (g.foodPop > 0)         return C_NUM_FOOD;
+    if (gv < DANGER_ZONE)      return C_NUM_LOW;
+    if (g.hyperTimer > 0)      return C_NUM_HIGH;
+    return C_NUM_NORMAL;
+  }
+
+  // ---- 主人公の右横に追従する縦向きの血糖バー ----
+  // 左上のメーターから目を離さずに済むよう、視線の近くにもう1つ置いている。
+  // 3Dで求めた画面座標は「実ウィンドウのピクセル」なので、設計座標へ戻してから描く。
+  void drawMiniGauge(Game g) {
+    if (g.state != STATE_RUNNING) return;
+
+    float dx = (view.miniSX - designOffsetX) / designScale;
+    float dy = (view.miniSY - designOffsetY) / designScale;
+    // カメラの後ろに回ったときなどの誤描画を防ぐ
+    if (dx < -100 || dx > SCREEN_W + 100 || dy < -200 || dy > SCREEN_H + 200) return;
+
+    float bw = MINI_GAUGE_W, bh = MINI_GAUGE_H;
+    float x0 = dx, y0 = dy - bh * 0.5;   // 左端・上下中央を投影点に合わせる
+
+    fill(0, 120);
+    rect(x0 - 2, y0 - 2, bw + 4, bh + 4, 8);
+
+    // 下が0、上が100。左上のメーターと同じ配色にして読み替えを不要にする。
+    vBand(x0, y0, bw, bh, 0,                  DANGER_ZONE * 0.35f, C_GLU_CRITICAL);
+    vBand(x0, y0, bw, bh, DANGER_ZONE * 0.35f, DANGER_ZONE,        C_GLU_LOW);
+    vBand(x0, y0, bw, bh, DANGER_ZONE,         STABLE_MIN,         C_GLU_MID);
+    vBand(x0, y0, bw, bh, STABLE_MIN,          STABLE_MAX,         C_GLU_STABLE);
+    vBand(x0, y0, bw, bh, STABLE_MAX,          100,                C_GLU_HIGH);
+
+    drawMiniDangerRing(g, x0, y0, bw, bh);
+
+    float gv = constrain(g.glucose, 0, 100);
+    fill(255);
+    rect(x0 - 4, y0 + bh * (1 - gv / 100) - 2, bw + 8, 4, 2);   // 針
+  }
+
+  // 血糖 lo〜hi の範囲を縦バーの該当位置に塗る
+  void vBand(float x0, float y0, float bw, float bh, float lo, float hi, int c) {
+    fill(c);
+    rect(x0, y0 + bh * (1 - hi / 100), bw, bh * (hi - lo) / 100);
+  }
+
+  // 危険なとき枠を光らせる。高血糖=赤の等間隔、低血糖=青の鼓動。
+  // 色だけでなく点滅のリズムも変えることで、視界の端でも区別できる。
+  void drawMiniDangerRing(Game g, float x0, float y0, float bw, float bh) {
+    float gv = constrain(g.glucose, 0, 100);
+    int c;
+    float a;
+    if (g.hyperTimer > 0)      { c = C_RING_HIGH; a = 120 + 135 * abs(sin(millis() * 0.012)); }
+    else if (gv < DANGER_ZONE) { c = C_GLU_LOW; a = 110 + 145 * abs(sin(millis() * 0.008)); }
+    else return;
+
+    stroke(red(c), green(c), blue(c), a);
+    strokeWeight(3);
+    noFill();
+    rect(x0 - 2, y0 - 2, bw + 4, bh + 4, 8);
+    noStroke();
+  }
+
+  // ---- ゾーンゲージ ----
   void drawZone(Game g) {
     float px = 24, py = 118, pw = 300, ph = 46;
     fill(0, 150);
     rect(px, py, pw, ph, 10);
 
-    if (fontSmall != null) textFont(fontSmall);
+    setText(fontSmall, 13);
     textAlign(LEFT, TOP);
-    textSize(13);
     if (g.zoneActive > 0) {
       fill(255, 204, 0);
       text("ゾーン発動中! 残り " + nf(g.zoneActive, 1, 1) + " 秒", px + 14, py + 7);
@@ -154,81 +203,24 @@ class Hud {
     rect(bx, by, bw * (g.zoneGauge / 100), bh, 5);
   }
 
-  // ---- マンジャロ ----
-  // 「補充中」ではなく、現実の投与間隔を再現していることが伝わる表示にする。
-  void drawShot(Game g) {
-    float pw = 250, ph = 128;
-    float px = SCREEN_W - pw - 24, py = SCREEN_H - ph - 24;
-
-    int bc;   // 枠の色
-    String title, sub;
-    if (g.lock > 0) {
-      bc = color(255, 68, 170);
-      title = "奪われた";
-      sub = "取り返すまで " + nf(g.lock, 1, 1) + " 秒";
-    } else if (g.shotFlash > 0) {
-      bc = color(255);
-      title = "投与!";
-      sub = g.lastCleared > 0 ? ("食べ物 " + g.lastCleared + " 個を消した") : "前方に食べ物なし";
-    } else if (g.shotCooldown > 0) {
-      bc = color(122, 122, 134);
-      if (g.shotEffect > 0) {
-        title = "作用中:血糖上昇なし";
-        sub = "低下はゆっくり継続";
-      } else {
-        // 現実の週1回投与を、ゲーム内では7秒=7日として圧縮表現している。
-        // 「補充中」ではなく「次の投与日まで待つ」ことが伝わる言い方にする。
-        int daysLeft = max(1, ceil(g.shotCooldown / SHOT_COOLDOWN * 7));
-        title = "今週分を投与済み";
-        sub = "次回投与まで あと" + daysLeft + "日";
-      }
-    } else {
-      bc = color(102, 255, 102);
-      title = "投与日:使用できます";
-      sub = "スペースで注射";
-    }
-
-    fill(0, 165);
-    stroke(bc);
-    strokeWeight(3);
-    rect(px, py, pw, ph, 14);
-    noStroke();
-
+  // ---- タイム・残り・ベスト ----
+  void drawTime(Game g) {
+    setText(fontBig, 30);
     textAlign(CENTER, TOP);
-    if (fontMid != null) textFont(fontMid);
-    textSize(19);
-    fill(bc);
-    text("マンジャロ", px + pw * 0.5, py + 10);
-
-    if (fontSmall != null) textFont(fontSmall);
-    textSize(15);
     fill(255);
-    text(title, px + pw * 0.5, py + 38);
-    textSize(13);
-    fill(255, 210);
-    text(sub, px + pw * 0.5, py + 60);
+    text(nf(g.elapsed, 1, 2), SCREEN_W * 0.5, 16);
 
-    // 投与間隔のゲージ。満タン = 打てる。
-    // 「1週間に1度しか打てない薬」であることを、溜まっていく時間そのもので示す。
-    float bx = px + 16, by = py + 88, bw = pw - 32, bh = 10;
-    float ratio;
-    if (g.lock > 0)              ratio = 1 - g.lock / LOCK_DURATION;
-    else if (g.shotCooldown > 0) ratio = 1 - g.shotCooldown / SHOT_COOLDOWN;
-    else                         ratio = 1;
-    fill(255, 40);
-    rect(bx, by, bw, bh, 5);
-    fill(bc);
-    rect(bx, by, bw * constrain(ratio, 0, 1), bh, 5);
-
-    if (fontSmall != null) textFont(fontSmall);
-    textSize(11);
-    fill(255, 150);
-    textAlign(CENTER, TOP);
-    text("週1回しか打てない薬", px + pw * 0.5, py + 103);
+    setText(fontSmall, 13);
+    fill(255, 220);
+    String sub = "ゴールまで 約" + int(g.secondsToGoal()) + "秒";
+    sub += g.bestTime > 0 ? "　ベスト " + nf(g.bestTime, 1, 2) + "秒" : "　ベスト --";
+    text(sub, SCREEN_W * 0.5, 56);
   }
 
-  // 壁の直前には「食べ物2個+女性」の列が続く。ゾーンで女性側を抜け、
-  // その後の壁に備えてマンジャロを温存する攻略を、初見でも判断できるよう予告する。
+  // ---- 終盤チャレンジの予告 ----
+  // 壁の直前には「食べ物2個+女性」の列が続く。
+  // ゾーンで女性側を抜け、壁に備えてマンジャロを温存する——という攻略を、
+  // 初見でも判断できるよう手前で知らせる。
   void drawFinalHint(Game g) {
     if (g.state != STATE_RUNNING) return;
     if (g.course.challengeStart < 0 || g.z >= g.course.wallStart) return;
@@ -240,59 +232,41 @@ class Hud {
       ? "終盤まで " + max(1, ceil(sec)) + "秒　Zを準備・マンジャロを温存"
       : "Zで女性をすり抜けろ!　マンジャロは次の壁へ温存";
 
-    if (fontMid != null) textFont(fontMid);
+    setText(fontMid, 19);
     textAlign(CENTER, TOP);
-    textSize(19);
     fill(0, 170);
     rect(SCREEN_W * 0.5 - 260, 120, 520, 40, 10);
     fill(255, 220, 90);
     text(msg, SCREEN_W * 0.5, 129);
   }
 
-  void drawTime(Game g) {
-    if (fontBig != null) textFont(fontBig);
-    textAlign(CENTER, TOP);
-    fill(255);
-    textSize(30);
-    text(nf(g.elapsed, 1, 2), SCREEN_W * 0.5, 16);
-
-    if (fontSmall != null) textFont(fontSmall);
-    textSize(13);
-    fill(255, 220);
-    String sub = "ゴールまで 約" + int(g.secondsToGoal()) + "秒";
-    if (g.bestTime > 0) sub += "　ベスト " + nf(g.bestTime, 1, 2) + "秒";
-    else                sub += "　ベスト --";
-    text(sub, SCREEN_W * 0.5, 56);
-  }
-
+  // ---- 血糖の危険警告 ----
   void drawWarnings(Game g) {
     if (g.state != STATE_RUNNING) return;
     float gv = constrain(g.glucose, 0, 100);
 
-    // 画面のフチ。高血糖=赤、低血糖=青。青が安全に見えないよう暗く沈める。
     if (g.hyperTimer > 0) {
-      float a = 120 + 100 * abs(sin(millis() * 0.012));
-      drawVignette(color(255, 0, 0), a);
-      if (fontBig != null) textFont(fontBig);
+      vignette(C_WARN_HIGH, 120 + 100 * abs(sin(millis() * 0.012)));
+      setText(fontBig, 28);
       textAlign(CENTER, TOP);
       fill(255, 60, 60);
-      textSize(28);
       text("⚠ 高血糖! あと " + nf(g.hyperTimer, 1, 1) + " 秒", SCREEN_W * 0.5, 88);
+
     } else if (gv < DANGER_ZONE) {
-      float a = 90 + 110 * abs(sin(millis() * 0.008));
-      drawVignette(color(43, 92, 255), a);
+      vignette(C_GLU_LOW, 90 + 110 * abs(sin(millis() * 0.008)));
+      // 青は放っておくと「安全・涼しい」に見える。画面を暗く沈めて、
+      // 意識が遠のく感じを出すことで危険さを伝えている。
       fill(0, 60);
-      rect(0, 0, SCREEN_W, SCREEN_H);   // 意識が遠のく感じの暗転
-      if (fontBig != null) textFont(fontBig);
+      rect(0, 0, SCREEN_W, SCREEN_H);
+      setText(fontBig, 28);
       textAlign(CENTER, TOP);
       fill(140, 180, 255);
-      textSize(28);
       text("⚠ 低血糖! 食べろ", SCREEN_W * 0.5, 88);
     }
   }
 
   // 画面の四辺を帯で覆う簡易ヴィネット
-  void drawVignette(int c, float a) {
+  void vignette(int c, float a) {
     noStroke();
     fill(red(c), green(c), blue(c), a);
     float t = 70;
@@ -300,54 +274,5 @@ class Hud {
     rect(0, SCREEN_H - t, SCREEN_W, t);
     rect(0, 0, t, SCREEN_H);
     rect(SCREEN_W - t, 0, t, SCREEN_H);
-  }
-
-  void drawOverlays(Game g) {
-    if (g.state == STATE_RUNNING) return;
-
-    fill(0, 170);
-    rect(0, 0, SCREEN_W, SCREEN_H);
-    textAlign(CENTER, CENTER);
-
-    if (g.state == STATE_READY) {
-      if (fontBig != null) textFont(fontBig);
-      fill(255); textSize(34);
-      text("マンジャロ日本縦断", SCREEN_W * 0.5, 200);
-      if (fontSmall != null) textFont(fontSmall);
-      textSize(16); fill(255, 230);
-      text("←→ / A・D:レーン移動　スペース:マンジャロ　Z:ゾーン　R:リトライ", SCREEN_W * 0.5, 280);
-      text("血糖値を " + int(STABLE_MIN) + "〜" + int(STABLE_MAX) + "(緑)に保て。0で低血糖、" + int(HYPER_THRESHOLD) + "超で高血糖。どちらも倒れる。", SCREEN_W * 0.5, 320);
-      text("スペースで目の前の食べ物を消せる。ただし次に打てるまで " + int(SHOT_COOLDOWN) + " 秒かかる。", SCREEN_W * 0.5, 356);
-      text("緑をキープするとゾーンが溜まり、Zキーで超加速。終盤には消さないと抜けられない壁がある。", SCREEN_W * 0.5, 392);
-      textSize(20); fill(255, 204, 0);
-      text("Enter または クリックでスタート", SCREEN_W * 0.5, 470);
-
-    } else if (g.state == STATE_OVER) {
-      if (fontBig != null) textFont(fontBig);
-      fill(255, 90, 90); textSize(34);
-      text(g.overTitle, SCREEN_W * 0.5, 240);
-      if (fontSmall != null) textFont(fontSmall);
-      fill(255); textSize(16);
-      text(g.overReason, SCREEN_W * 0.5, 300);
-      text("R キーでリトライ", SCREEN_W * 0.5, 360);
-
-    } else if (g.state == STATE_GOAL) {
-      if (fontBig != null) textFont(fontBig);
-      fill(255, 204, 0); textSize(36);
-      text("GOAL!", SCREEN_W * 0.5, 190);
-      text(nf(g.elapsed, 1, 2) + " 秒", SCREEN_W * 0.5, 250);
-      if (g.newRecord) {
-        fill(255, 230, 90); textSize(24);
-        text("ハイスコア更新!", SCREEN_W * 0.5, 305);
-      }
-      if (fontSmall != null) textFont(fontSmall);
-      fill(255); textSize(15);
-      text("マンジャロ " + g.shotCount + " 回(食べ物 " + g.clearedCount + " 個を消去)　奪われ " + g.robbedCount + " 回　ゾーン合計 " + nf(g.zoneTotal, 1, 1) + " 秒",
-           SCREEN_W * 0.5, 360);
-      textSize(17); fill(255, 220);
-      text("あなたはこの薬を、何のために使いましたか。", SCREEN_W * 0.5, 410);
-      textSize(15); fill(255, 200);
-      text("R キーでリトライ", SCREEN_W * 0.5, 460);
-    }
   }
 }

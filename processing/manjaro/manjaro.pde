@@ -38,7 +38,7 @@ void setup() {
   view = new View3D();
   hud  = new Hud();
 
-  hud.loadFonts();
+  loadFonts();
   game.loadBest();
   game.course.build();
   lastMillis = millis();   // 1フレーム目に起動時間ぶんの dt が入らないようにする
@@ -73,6 +73,7 @@ void draw() {
   background(135, 206, 235);
   view.apply(game);
   view.drawWorld(game);
+  view.computeMiniGaugePos(game);   // HUD がカメラを戻す前に投影しておく
   hud.draw(game);
 }
 
