@@ -17,12 +17,14 @@ class Assets {
   PImage food;
   PImage woman;
   PImage sky;
+  PImage title;
 
   void load() {
     player = tryLoad("images/player.png");
     food   = tryLoad("images/food.png");
     woman  = tryLoad("images/woman.png");
     sky    = tryLoad("images/sky.png");
+    title   = tryLoad("images/title.png");
   }
 
   // 読めなければ null を返す。エラーで止めない。

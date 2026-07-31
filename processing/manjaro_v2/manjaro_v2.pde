@@ -102,6 +102,11 @@ void draw() {
 }
 
 void keyPressed() {
+  if (game.state == STATE_TITLE) {
+    if (key == ENTER || key == RETURN) game.state = STATE_READY;
+    return;
+  }
+
   if (game.state == STATE_READY) {
     if (key == ENTER || key == RETURN) game.reset();
     return;

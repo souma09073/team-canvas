@@ -423,7 +423,7 @@ class View3D {
     if (USE_IMAGES && assets.player != null) {
       // 影は必ず地面(y=0)に置く。主人公は跳ねるので、影が離れるほど跳んで見える。
       // 影が無いと、地面に立っているのか浮いているのか分からない。
-      drawGroundShadow(g.x, g.z, 1.5 - bob * 0.8);
+      drawGroundShadow(g.x, g.z + 1.3, 1.5 - bob * 0.8);
 
       // 絵の縦横を少しだけ変えて、着地の重みと食べた瞬間の反応を出す
       float squash = 1 - abs(sin(g.elapsed * bobRate)) * 0.04;

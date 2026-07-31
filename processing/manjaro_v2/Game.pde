@@ -16,11 +16,12 @@
 //   タイトル → カウントダウン → 走行 → フェリー → カウントダウン → 走行 → … → ゴール
 //
 // 「倒れた」という状態は無い。血糖が振り切れても一定時間止まるだけで、そのまま続く。
-final int STATE_READY     = 0;   // タイトル画面
-final int STATE_COUNTDOWN = 1;   // 3・2・1。世界は見えているが動かない
-final int STATE_RUNNING   = 2;   // 走行中
-final int STATE_FERRY     = 3;   // フェリーで移動中
-final int STATE_GOAL      = 4;   // ゴールした
+final int STATE_TITLE     = 0;   // タイトル画面
+final int STATE_READY     = 1;   // 説明画面
+final int STATE_COUNTDOWN = 2;   // 3・2・1。世界は見えているが動かない
+final int STATE_RUNNING   = 3;   // 走行中
+final int STATE_FERRY     = 4;   // フェリーで移動中
+final int STATE_GOAL      = 5;   // ゴールした
 
 class Game {
   Course course = new Course();
