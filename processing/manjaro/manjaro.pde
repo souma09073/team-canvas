@@ -17,21 +17,27 @@ View3D view;
 Hud hud;
 
 void settings() {
-  // ディスプレイに収まる最大の16:9を選ぶ。1280x720 の決め打ちだと、
-  // 画面の小さいPCや表示倍率125%の環境でウィンドウがはみ出す。
-  int w = min(SCREEN_W, int(displayWidth * 0.92));
-  int h = w * SCREEN_H / SCREEN_W;
-  if (h > displayHeight * 0.88) {
-    h = int(displayHeight * 0.88);
-    w = h * SCREEN_W / SCREEN_H;
+  if (FULLSCREEN) {
+    // 画面いっぱいに開く。どんな解像度・表示倍率のPCでも必ず収まる。
+    fullScreen(P3D);
+  } else {
+    // ウィンドウ表示。ディスプレイに収まる最大の16:9を選ぶ。
+    // ただし表示倍率が効いている環境では、指定より大きく表示されてはみ出すことがある。
+    int w = min(SCREEN_W, int(displayWidth * 0.85));
+    int h = w * SCREEN_H / SCREEN_W;
+    if (h > displayHeight * 0.80) {
+      h = int(displayHeight * 0.80);
+      w = h * SCREEN_W / SCREEN_H;
+    }
+    size(w, h, P3D);
   }
-  size(w, h, P3D);
   smooth(4);
 }
 
 void setup() {
   surface.setTitle("マンジャロ日本縦断");
   frameRate(60);
+  if (!FULLSCREEN) surface.setResizable(true);   // 収まらないとき手で直せるように
   computeDesignTransform();
 
   game = new Game();
@@ -57,8 +63,16 @@ void setup() {
 }
 
 int lastMillis = 0;
+int lastW = 0, lastH = 0;   // ウィンドウの大きさ。変わったら表示倍率を計算し直す
 
 void draw() {
+  // ウィンドウをドラッグで広げたときにもレイアウトを追従させる
+  if (width != lastW || height != lastH) {
+    computeDesignTransform();
+    lastW = width;
+    lastH = height;
+  }
+
   // 経過時間は実測する。1.0/frameRate は「平均フレームレートからの推定値」なので、
   // 実際のフレーム間隔とずれると、血糖の増減やタイマーの進み方が本来より速くも遅くもなる。
   // (Processing は起動直後 frameRate を 10 として返すため、開始直後ほどずれが大きい)

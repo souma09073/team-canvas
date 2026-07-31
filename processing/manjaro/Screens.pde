@@ -36,8 +36,12 @@ class Screens {
        + "終盤には消さないと抜けられない壁がある。", SCREEN_W * 0.5, 392);
 
     setText(fontBig, 20);
-    fill(255, 204, 0);
+    fill(C_ACCENT);
     text("Enter または クリックでスタート", SCREEN_W * 0.5, 470);
+
+    setText(fontSmall, 13);
+    fill(255, 150);
+    text("ESC キーで終了", SCREEN_W * 0.5, 520);
   }
 
   void drawGameOver(Game g) {
