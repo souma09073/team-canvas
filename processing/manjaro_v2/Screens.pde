@@ -45,31 +45,71 @@ class Screens {
   }
 
   void drawGoal(Game g) {
-    setText(fontBig, 36);
-    fill(255, 204, 0);
-    text("GOAL!", SCREEN_W * 0.5, 190);
-    text(nf(g.elapsed, 1, 2) + " 秒", SCREEN_W * 0.5, 250);
+    setText(fontBig, 34);
+    fill(C_ACCENT);
+    text("日本縦断 達成", SCREEN_W * 0.5, 120);
+
+    setText(fontBig, 46);
+    fill(255);
+    text(nf(g.elapsed, 1, 2) + " 秒", SCREEN_W * 0.5, 180);
 
     if (g.newRecord) {
-      setText(fontBig, 24);
+      setText(fontBig, 22);
       fill(255, 230, 90);
-      text("ハイスコア更新!", SCREEN_W * 0.5, 305);
+      text("ハイスコア更新!", SCREEN_W * 0.5, 228);
     }
 
+    drawStats(g);
+    drawClosing(g);
+
+    setText(fontSmall, 14);
+    fill(255, 170);
+    text("R キーでもう一度", SCREEN_W * 0.5, 640);
+  }
+
+  void drawStats(Game g) {
+    int weeks = (g.shotUsedInRegion == null) ? 0 : g.shotUsedInRegion.length;
+
     setText(fontSmall, 15);
-    fill(255);
-    text("マンジャロ " + g.shotCount + " 回"
-       + "　倒れた " + g.collapseCount + " 回"
-       + "　奪われ " + g.robbedCount + " 回"
-       + "　ゾーン合計 " + nf(g.zoneTotal, 1, 1) + " 秒", SCREEN_W * 0.5, 360);
+    fill(255, 230);
+    text("マンジャロ " + g.shotCount + " / " + weeks + " 回"
+       + "　　倒れた " + g.collapseCount + " 回"
+       + "　　ゾーン " + nf(g.zoneTotal, 1, 1) + " 秒", SCREEN_W * 0.5, 285);
+  }
 
-    // このゲームの主題。タイムを競った直後に問い返すことで効かせている。
-    textSize(17);
-    fill(255, 220);
-    text("あなたはこの薬を、何のために使いましたか。", SCREEN_W * 0.5, 410);
+  // ---- このゲームの主題 ----
+  // タイムを競わせた直後に問い返すことで効かせている。
+  // 返ってくる言葉は、プレイヤーが薬を何回使ったかで変わる。
+  // 説教にせず、事実を差し出して考えさせるのが狙い。
+  void drawClosing(Game g) {
+    // 区切り線。ここから先が問いかけであることを、見た目で分ける
+    stroke(255, 60);
+    strokeWeight(1);
+    line(SCREEN_W * 0.5 - 240, 340, SCREEN_W * 0.5 + 240, 340);
+    noStroke();
 
-    textSize(15);
-    fill(255, 200);
-    text("R キーでリトライ", SCREEN_W * 0.5, 460);
+    setText(fontMid, 20);
+    fill(255, 230);
+    text("あなたはこの薬を、何のために使いましたか。", SCREEN_W * 0.5, 400);
+
+    setText(fontBig, 26);
+    fill(C_ACCENT);
+    text(closingLine(g), SCREEN_W * 0.5, 480);
+
+    stroke(255, 60);
+    line(SCREEN_W * 0.5 - 240, 545, SCREEN_W * 0.5 + 240, 545);
+    noStroke();
+  }
+
+  // 使った回数で結びが変わる。
+  // 割合で判定しているので、エリアの数を変えてもそのまま動く。
+  String closingLine(Game g) {
+    int weeks = (g.shotUsedInRegion == null) ? 4 : g.shotUsedInRegion.length;
+    int used = g.shotCount;
+
+    if (used == 0)              return "あなたは、最後まで自分の足で走りきった。";
+    if (used <= weeks / 2)      return "必要なときだけ、頼った。";
+    if (used < weeks)           return "気づけば、手が伸びていた。";
+    return "速く走るために、何を差し出しましたか。";
   }
 }
