@@ -162,9 +162,7 @@ class Runner {
   }
 
   void draw() {
-    hint(DISABLE_DEPTH_TEST);
-    camera();
-    ortho();
+    beginDesignSpace();
 
     for (SweatDrop drop : sweat) drop.draw();
 
@@ -190,7 +188,7 @@ class Runner {
       imageMode(CORNER);
     }
 
-    hint(ENABLE_DEPTH_TEST);
+    endDesignSpace();
   }
 
   void drawThirtyFrameCycle(

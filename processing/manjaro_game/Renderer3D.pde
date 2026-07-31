@@ -11,33 +11,33 @@ class RoadRenderer {
   }
 
   void drawBackground() {
-    hint(DISABLE_DEPTH_TEST);
-    camera();
-    ortho();
-    background(94, 190, 225);
+    beginDesignSpace();
+    background(0);              // 画面比が合わないPCで余る帯は黒で埋める
+
+    noStroke();
+    fill(94, 190, 225);
+    rect(0, 0, SCREEN_W, SCREEN_H);   // 画像が無いときの空色
 
     if (backgroundImage != null) {
       imageMode(CORNER);
-      image(backgroundImage, 0, 0, width, height);
+      image(backgroundImage, 0, 0, SCREEN_W, SCREEN_H);
     }
-    hint(ENABLE_DEPTH_TEST);
+    endDesignSpace();
   }
 
   void drawRoad() {
-    hint(DISABLE_DEPTH_TEST);
-    camera();
-    ortho();
+    beginDesignSpace();
     noStroke();
 
-    float cx = width * 0.5;
+    float cx = SCREEN_W * 0.5;
 
     // 路肩の明るい縁。背景の砂色と道路を自然につなぐ。
     fill(246, 199, 119);
     quad(
       cx - ROAD_TOP_HALF - 12, HORIZON_Y,
       cx + ROAD_TOP_HALF + 12, HORIZON_Y,
-      cx + ROAD_BOTTOM_HALF + 34, height,
-      cx - ROAD_BOTTOM_HALF - 34, height
+      cx + ROAD_BOTTOM_HALF + 34, SCREEN_H,
+      cx - ROAD_BOTTOM_HALF - 34, SCREEN_H
     );
 
     // アスファルト。上下で色を変え、奥行きと夕方の光を出す。
@@ -46,27 +46,27 @@ class RoadRenderer {
     vertex(cx - ROAD_TOP_HALF, HORIZON_Y);
     vertex(cx + ROAD_TOP_HALF, HORIZON_Y);
     fill(73, 61, 58);
-    vertex(cx + ROAD_BOTTOM_HALF, height);
-    vertex(cx - ROAD_BOTTOM_HALF, height);
+    vertex(cx + ROAD_BOTTOM_HALF, SCREEN_H);
+    vertex(cx - ROAD_BOTTOM_HALF, SCREEN_H);
     endShape();
 
     drawRoadEdges(cx);
     drawLaneMarkers(cx);
     drawMovingHighlights(cx);
 
-    hint(ENABLE_DEPTH_TEST);
+    endDesignSpace();
   }
 
   void drawRoadEdges(float cx) {
     strokeWeight(5);
     stroke(255, 245, 214, 235);
-    line(cx - ROAD_TOP_HALF, HORIZON_Y, cx - ROAD_BOTTOM_HALF, height);
-    line(cx + ROAD_TOP_HALF, HORIZON_Y, cx + ROAD_BOTTOM_HALF, height);
+    line(cx - ROAD_TOP_HALF, HORIZON_Y, cx - ROAD_BOTTOM_HALF, SCREEN_H);
+    line(cx + ROAD_TOP_HALF, HORIZON_Y, cx + ROAD_BOTTOM_HALF, SCREEN_H);
 
     strokeWeight(2);
     stroke(91, 50, 38, 140);
-    line(cx - ROAD_TOP_HALF - 9, HORIZON_Y, cx - ROAD_BOTTOM_HALF - 25, height);
-    line(cx + ROAD_TOP_HALF + 9, HORIZON_Y, cx + ROAD_BOTTOM_HALF + 25, height);
+    line(cx - ROAD_TOP_HALF - 9, HORIZON_Y, cx - ROAD_BOTTOM_HALF - 25, SCREEN_H);
+    line(cx + ROAD_TOP_HALF + 9, HORIZON_Y, cx + ROAD_BOTTOM_HALF + 25, SCREEN_H);
     noStroke();
   }
 
@@ -99,14 +99,14 @@ class RoadRenderer {
       float y = perspectiveY(t);
       float half = lerp(ROAD_TOP_HALF, ROAD_BOTTOM_HALF, easePerspective(t));
       fill(255, 184, 105, 7 + int(t * 12));
-      quad(width * 0.5 - half, y, width * 0.5 + half, y,
-           width * 0.5 + half * 1.035, y + 3 + t * 8,
-           width * 0.5 - half * 1.035, y + 3 + t * 8);
+      quad(SCREEN_W * 0.5 - half, y, SCREEN_W * 0.5 + half, y,
+           SCREEN_W * 0.5 + half * 1.035, y + 3 + t * 8,
+           SCREEN_W * 0.5 - half * 1.035, y + 3 + t * 8);
     }
   }
 
   float perspectiveY(float t) {
-    return lerp(HORIZON_Y, height, easePerspective(t));
+    return lerp(HORIZON_Y, SCREEN_H, easePerspective(t));
   }
 
   float laneDividerX(float cx, float laneRatio, float t) {

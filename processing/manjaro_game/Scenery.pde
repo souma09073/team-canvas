@@ -53,9 +53,7 @@ class RoadsideScenery {
   void draw() {
     if (atlas == null) return;
 
-    hint(DISABLE_DEPTH_TEST);
-    camera();
-    ortho();
+    beginDesignSpace();
 
     for (int band = 0; band < 30; band++) {
       float low = band / 30.0;
@@ -65,7 +63,7 @@ class RoadsideScenery {
       }
     }
 
-    hint(ENABLE_DEPTH_TEST);
+    endDesignSpace();
   }
 
   void drawBlock(RoadsideBlock block) {
@@ -73,8 +71,8 @@ class RoadsideScenery {
     float perspective = t * t;
     float roadHalf = lerp(ROAD_TOP_HALF, ROAD_BOTTOM_HALF, perspective);
     float outward = lerp(22, block.edgeDistance, perspective);
-    float x = width * 0.5 + block.side * (roadHalf + outward);
-    float y = lerp(HORIZON_Y + 8, height + 60, perspective);
+    float x = SCREEN_W * 0.5 + block.side * (roadHalf + outward);
+    float y = lerp(HORIZON_Y + 8, SCREEN_H + 60, perspective);
 
     // 近景では街区が画面の左右を大きく占める。
     float drawH = lerp(70, 650, perspective) * block.sizeVariation;

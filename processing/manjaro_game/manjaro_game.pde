@@ -10,13 +10,22 @@ RoadsideScenery scenery;
 PrototypeHUD hud;
 
 void settings() {
-  size(1280, 720, P3D);
+  // ディスプレイに収まる最大の16:9サイズを選ぶ。1280x720 を決め打ちにすると、
+  // 画面の小さいPCや表示倍率(125%/150%)の設定でウィンドウがはみ出してしまう。
+  int w = min(SCREEN_W, int(displayWidth * 0.92));
+  int h = w * SCREEN_H / SCREEN_W;
+  if (h > displayHeight * 0.88) {
+    h = int(displayHeight * 0.88);
+    w = h * SCREEN_W / SCREEN_H;
+  }
+  size(w, h, P3D);
   smooth(8);
 }
 
 void setup() {
   surface.setTitle("マンジャロ日本縦断ゲーム - Visual Prototype");
   frameRate(60);
+  computeDesignTransform();
 
   assets = new AssetStore();
   assets.load();
