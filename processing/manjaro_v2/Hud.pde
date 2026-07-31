@@ -28,6 +28,7 @@ class Hud {
   void draw(Game g) {
     begin();
     noStroke();
+    drawWarnings(g);
 
     drawProgress(g);
     drawGlucose(g);
@@ -38,7 +39,6 @@ class Hud {
     drawRegionBanner(g);
     drawPortApproach(g);
     drawFinalHint(g);
-    drawWarnings(g);
     drawStopped(g);
     screens.draw(g);
 
