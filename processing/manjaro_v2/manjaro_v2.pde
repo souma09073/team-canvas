@@ -22,6 +22,10 @@
 //   Screens.pde … タイトル / フェリー / カウントダウン / ゴール
 // ============================================================
 
+import processing.sound.*;
+
+SoundFile soundPlayMusic1, soundPlayMusic2, soundPlayMusic3,soundPlayMusic4, soundPlayMusic5, soundRunning, soundBoost, soundRetry, soundGameOver, soundClear, soundScreenTransition, soundMovingSea, soundGetManjaro, soundHealthMax, soundEat1, soundEat2;
+
 Game game;
 View3D view;
 Hud hud;
@@ -70,6 +74,24 @@ void setup() {
   println("食べ物 " + game.course.foods.size() + " 個"
         + " / 岩 " + game.course.rocks.size() + " 個"
         + " / 女性 " + game.course.women.size() + " 体");
+
+  soundPlayMusic1= new SoundFile(this, "sounds/afternoon.mp3");//おしゃれな曲　タイトルの曲によさそう
+  soundPlayMusic2 = new SoundFile(this, "sounds/glory60s.mp3");//平和最初　初めのほうのステージ沖縄とか
+  soundPlayMusic3 = new SoundFile(this, "sounds/last-war.mp3");//ボスっぽい　最後のほうのステージ北海道とか
+  soundPlayMusic4 = new SoundFile(this, "sounds/arabianjewel.mp3");//アラビアンな曲　西日本によさそう
+  soundPlayMusic5 = new SoundFile(this, "sounds/valley.mp3");//ボス戦に近そうな曲第一形態みたいな　東日本によさそう　
+  soundGetManjaro = new SoundFile(this, "sounds/決定ボタンを押す49.mp3");//マンジャロ使用音
+  soundGameOver = new SoundFile(this, "sounds/チーン1.mp3");//ゲームオーバー音源
+  soundEat1 = new SoundFile(this, "sounds/リンゴをかじる.mp3");//食べ物食べる音1
+  soundEat2 = new SoundFile(this, "sounds/お菓子を食べる1.mp3");//食べ物食べる音2
+  soundHealthMax = new SoundFile(this, "sounds/ゲージ回復2.mp3");//マンジャロ使用可能になったとき　あるいは何かのゲージがたまったとき
+  soundClear = new SoundFile(this, "sounds/成功音.mp3");//クリア!!
+  soundMovingSea = new SoundFile(this, "sounds/海岸1.mp3");// 船の移動
+  soundScreenTransition = new SoundFile(this, "sounds/土の上を走る.mp3");//画面切り替えの、走るような音
+  soundRunning = new SoundFile(this, "sounds/アスファルトの上を走る1.mp3");//人が走る音
+  soundBoost = new SoundFile(this, "sounds/超高速ダッシュ.mp3");//加速する
+  soundRetry = new SoundFile(this, "sounds/決定ボタンを押す33.mp3");//リトライ音
+
 }
 
 int lastMillis = 0;
