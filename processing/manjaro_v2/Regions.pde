@@ -1,55 +1,85 @@
 // ============================================================
-// エリア(区間)。
+// エリア(ステージ)。沖縄 → 本州西 → 本州東 → 北海道。
 //
-// 企画書では「沖縄 → 本州西 → 本州東 → 北海道」の全4ステージ構成だが、
-// ステージを分けるのではなく、1本のコースを4つの区間に区切って表現している。
-// 走り続けたまま土地が移り変わるので、「日本縦断」が体感として出る。
+// 【エリアは離れて置かれている】
+// エリアとエリアの間には REGION_GAP ぶんの空白がある。ここは海で、走らない。
+// ゴールの港で船に乗り、次のエリアの港へ運ばれる(leaveFerry() が z を飛ばす)。
 //
-// 【速度の考え方】
-// エリア内では少しずつ加速し、フェリーに着くと次のエリアの開始速度に戻る。
-// 開始速度はエリアが進むほど上がるので全体としては速くなっていくが、
-// 休憩のたびに一度リセットされるため、いきなり手に負えなくならない。
+//   沖縄 [startZ ... endZ] ~~~ 海 ~~~ 本州西 [startZ ... endZ] ~~~ 海 ~~~ ...
 //
-// 【長さの決め方】
-// 速いエリアほど長くする。そうすれば、どのエリアも同じくらいの時間で走り終わる。
-// 長さは「目標秒数」と「速度」から自動で計算するので、手で調整する必要はない。
+// 空白は描画距離(DRAW_DIST)より長くしてある。だから港に立っても次のエリアは
+// 見えない。「同じ道の続き」ではなく「別の土地」として届く。
 //
-// エリアを増やしたい / 順番を変えたいときは buildRegions() の中身をいじるだけ。
+// 【速度】エリア内では少しずつ加速し、次のエリアでは開始速度に戻る。
+// 開始速度はエリアが進むほど上がるので全体としては速くなるが、
+// 港でいったんリセットされるため、いきなり手に負えなくならない。
+//
+// 【長さ】速いエリアほど長くする。そうすればどのエリアも同じ秒数で走り終わる。
+// 長さは targetSec と速度から自動計算するので、手で調整しなくていい。
+//
+// 【難易度】エリアが進むほど、食べ物の間隔が詰まり、血糖の振れ幅も大きくなる。
+// 間隔を「秒」で指定しているのがポイント。距離で指定すると、速いエリアほど
+// 食べ物が高速で流れてきて、難しさが速度に引きずられてしまう。
 // ============================================================
 
 class Region {
-  String name;        // 区間に入ったときに画面へ出す地名
-  float baseSpeed;    // このエリアの開始速度
-  float rampMult;     // エリアの終わりまでに何倍まで加速するか
-  float targetSec;    // 無減速で走り抜けたときの目安タイム。ここから長さが決まる
+  String name;         // 画面に出す地名
+  String startPort;    // このエリアの出発地(船で着いた港)
+  String goalPort;     // このエリアのゴール(次の船に乗る港)
 
-  color land;         // 道の左側(陸)の色
-  color sea;          // 道の右側(海)の色
-  String foodImage;   // その土地の食べ物の画像名。無ければ仮の球で描く
-  String skyImage;    // その土地の背景の画像名。無ければ空色で塗る
+  float baseSpeed;     // 開始速度
+  float rampMult;      // 終わりまでに何倍まで加速するか
+  float targetSec;     // 無停止で走り抜けたときの目安タイム。ここから長さが決まる
 
-  // このエリアを走り終えたあとのフェリーで、いったん止まるか。
-  // true  … 途中経過を見せて Enter 待ち(中間地点)
-  // false … 3秒の移動演出が流れて自動で次へ(テンポ優先)
-  boolean restAfter;
+  color land;          // 道の左側(陸)の色
+  color sea;           // 道の右側(海)の色
+  String foodImage;    // その土地の食べ物の画像名。無ければ仮の球で描く
+  String skyImage;     // その土地の背景の画像名。無ければ空色で塗る
 
-  // 以下は buildRegions() が計算して入れる
-  float startZ;
-  float endZ;
+  // 走り終えたあと、港で止まって途中経過を見せるか。
+  // true  … Enter 待ち(中間地点)  false … 演出が流れて自動で次へ(テンポ優先)
+  boolean restAfter = false;
 
-  Region(String name, float baseSpeed, float rampMult, float targetSec,
-         color land, color sea, String foodImage, String skyImage, boolean restAfter) {
-    this.name = name;
-    this.baseSpeed = baseSpeed;
-    this.rampMult = rampMult;
-    this.targetSec = targetSec;
-    this.land = land;
-    this.sea = sea;
-    this.foodImage = foodImage;
-    this.skyImage = skyImage;
-    this.restAfter = restAfter;
+  // ---- 難易度 ----
+  float foodGapSecMin = 0.5;   // 食べ物の間隔(秒)。狭いほど忙しい
+  float foodGapSecMax = 0.8;
+  float foodGain      = 20;    // 食べ物1つの血糖上昇
+  float drainPerSec   = 10;    // 血糖の毎秒自然減少
+  // 必要ペース = foodGain / drainPerSec 秒に1個。
+  // 上の表は全エリアで 2.0 秒になるよう組んである。忙しさは変えず、
+  // 「1回のミスがどれだけ響くか」だけがエリアごとに大きくなる。
+
+  float denseFrom = -1;        // 密集地帯の範囲(エリア内の割合 0〜1)。負なら密集なし
+  float denseTo   = -1;
+
+  // buildRegions() が計算して入れる
+  float startZ, endZ;
+
+  Region(String name) { this.name = name; }
+
+  // ---- 設定用。つなげて書ける(Regions の表を読みやすくするため)----
+  Region ports(String startPort, String goalPort) {
+    this.startPort = startPort;  this.goalPort = goalPort;  return this;
   }
+  Region speed(float baseSpeed, float rampMult, float targetSec) {
+    this.baseSpeed = baseSpeed;  this.rampMult = rampMult;  this.targetSec = targetSec;  return this;
+  }
+  Region look(color land, color sea, String foodImage, String skyImage) {
+    this.land = land;  this.sea = sea;
+    this.foodImage = foodImage;  this.skyImage = skyImage;  return this;
+  }
+  Region food(float gapSecMin, float gapSecMax, float gain, float drain) {
+    this.foodGapSecMin = gapSecMin;  this.foodGapSecMax = gapSecMax;
+    this.foodGain = gain;  this.drainPerSec = drain;  return this;
+  }
+  // 引数名を from / to にしないこと。Processing のパーサーが to を予約語として扱い、
+  // 「Syntax Error - Error on parameter or method declaration」で止まる。
+  Region dense(float fromRatio, float toRatio) {
+    this.denseFrom = fromRatio;  this.denseTo = toRatio;  return this;
+  }
+  Region rest() { this.restAfter = true; return this; }
 
+  // ---- 計算 ----
   float endSpeed() { return baseSpeed * rampMult; }
   float length()   { return endZ - startZ; }
 
@@ -67,43 +97,106 @@ class Region {
     float p = constrain((z - startZ) / max(1, length()), 0, 1);
     return baseSpeed + (endSpeed() - baseSpeed) * p;
   }
+
+  // 地点 fromZ からこのエリアのゴールまで、無停止で何秒かかるか。
+  // 速度が場所によって変わるので、細かく区切って足し上げている。
+  float secondsFrom(float fromZ) {
+    float remain = endZ - max(fromZ, startZ);
+    if (remain <= 0) return 0;
+
+    int steps = 12;
+    float total = 0;
+    for (int i = 0; i < steps; i++) {
+      float sampleZ = max(fromZ, startZ) + remain * (i + 0.5) / steps;
+      total += (remain / steps) / speedAt(sampleZ);
+    }
+    return total;
+  }
+
+  // 密集地帯。設定していなければ null。
+  DenseZone denseZone() {
+    if (denseFrom < 0) return null;
+    return new DenseZone(startZ + length() * denseFrom,
+                         startZ + length() * denseTo);
+  }
 }
 
 Region[] regions;
-float COURSE_LENGTH = 0;   // 全エリアの合計。buildRegions() が計算する
+float COURSE_LENGTH = 0;   // 最後のエリアのゴール地点(= ゲーム全体の終わり)
+float RUN_LENGTH    = 0;   // 実際に走る距離の合計。海の空白は含まない
 
 // setup() から呼ぶ。COURSE_LENGTH を使う処理より先に呼ぶこと。
+//
+// 【エリアを増やす / 順番を変える】この配列に行を足すだけでいい。
+// マンジャロの使用回数(1エリア1回)も、ゴール画面の文言も、
+// エリアの数から自動で決まるので、他は何も直さなくていい。
+//
+// 【港の名前】実在する港を当てている。那覇→鹿児島、仙台→苫小牧は実在の航路。
+// 気になったらここの文字列を書き換えるだけで直せる。
 void buildRegions() {
   regions = new Region[] {
-    //         地名          開始 加速 目標秒  陸の色           海の色          食べ物の画像         背景の画像        休憩
-    new Region("沖縄",        95, 1.5,  25,  C_OKINAWA_LAND,  C_OKINAWA_SEA,  "food_okinawa.png",  "sky_okinawa.png",  false),
-    new Region("本州 西日本", 115, 1.5,  25,  C_WEST_LAND,     C_WEST_SEA,     "food_west.png",     "sky_west.png",     true),   // 中間地点
-    new Region("本州 東日本", 135, 1.5,  25,  C_EAST_LAND,     C_EAST_SEA,     "food_east.png",     "sky_east.png",     false),
-    new Region("北海道",      160, 1.5,  25,  C_HOKKAIDO_LAND, C_HOKKAIDO_SEA, "food_hokkaido.png", "sky_hokkaido.png", false)
+
+    region("沖縄")
+      .ports("沖縄 糸満", "那覇港")
+      .speed(95, 1.5, 25)
+      .look(C_OKINAWA_LAND, C_OKINAWA_SEA, "food_okinawa.png", "sky_okinawa.png")
+      .food(0.50, 0.80, 16, 8),                 // 導入。密集なし
+
+    region("本州 西日本")
+      .ports("鹿児島港", "大阪港")
+      .speed(115, 1.5, 25)
+      .look(C_WEST_LAND, C_WEST_SEA, "food_west.png", "sky_west.png")
+      .food(0.42, 0.66, 20, 10)                 // 少し多め。まだ密集なし
+      .rest(),                                  // ← 中間地点。ここだけ止まる
+
+    region("本州 東日本")
+      .ports("名古屋港", "仙台港")
+      .speed(135, 1.5, 25)
+      .look(C_EAST_LAND, C_EAST_SEA, "food_east.png", "sky_east.png")
+      .food(0.38, 0.58, 24, 12)
+      .dense(0.45, 0.62),                       // 密集地帯がひとつ
+
+    region("北海道")
+      .ports("苫小牧港", "宗谷岬")
+      .speed(160, 1.5, 25)
+      .look(C_HOKKAIDO_LAND, C_HOKKAIDO_SEA, "food_hokkaido.png", "sky_hokkaido.png")
+      .food(0.32, 0.50, 28, 14)
+      .dense(0.38, 0.66)                        // 密集地帯が長い
   };
 
   // 全体の速さをまとめて掛ける。Config.pde の SPEED_SCALE で調整する。
   for (Region r : regions) r.baseSpeed *= SPEED_SCALE;
 
-  // 各エリアの長さを目標秒数から求め、先頭から順に並べる。
-  // 速度を上げると長さも自動で伸びるので、1エリアのタイムは変わらない。
+  // 各エリアの長さを目標秒数から求め、REGION_GAP の海を挟みながら並べる。
   float z = 0;
+  RUN_LENGTH = 0;
   for (Region r : regions) {
     r.startZ = z;
     z += r.requiredLength();
     r.endZ = z;
+    RUN_LENGTH += r.length();
+    z += REGION_GAP;        // 次のエリアまでの海。ここは走らない
   }
-  COURSE_LENGTH = z;
+  COURSE_LENGTH = regions[regions.length - 1].endZ;
 
   println("--- エリア構成 ---");
   for (Region r : regions) {
-    println(r.name + "  速度 " + int(r.baseSpeed) + "→" + int(r.endSpeed())
-          + "  長さ " + int(r.length()) + "  目安 " + int(r.targetSec) + "秒");
+    println(r.name + "  " + r.startPort + " → " + r.goalPort
+          + "  速度 " + int(r.baseSpeed) + "→" + int(r.endSpeed())
+          + "  長さ " + int(r.length()) + "  目安 " + int(r.targetSec) + "秒"
+          + "  食べ物 " + nf(r.foodGapSecMin, 1, 2) + "〜" + nf(r.foodGapSecMax, 1, 2) + "秒間隔"
+          + "  +" + int(r.foodGain) + "/-" + int(r.drainPerSec)
+          + (r.denseZone() != null ? "  密集あり" : ""));
   }
-  println("合計 " + int(COURSE_LENGTH) + " units / 走行 " + int(regions.length * regions[0].targetSec) + "秒");
+  println("走行距離 " + int(RUN_LENGTH) + " units / 走行 "
+        + int(regions.length * regions[0].targetSec) + "秒");
 }
 
-// 地点 z が何番目のエリアにあたるか
+// 表を読みやすくするための入口。new Region(...) と書くより意図が出る。
+Region region(String name) { return new Region(name); }
+
+// 地点 z が何番目のエリアにあたるか。
+// 海の空白にいる間は、直前のエリアを返す(通常そこは走らない)。
 int regionIndexAt(float z) {
   for (int i = regions.length - 1; i >= 0; i--) {
     if (z >= regions[i].startZ) return i;
@@ -114,31 +207,17 @@ int regionIndexAt(float z) {
 Region regionAt(float z) { return regions[regionIndexAt(z)]; }
 
 // 地点 z における走行速度。エリアが変わると開始速度へ戻る。
-float speedAtZ(float z) {
-  return regions[regionIndexAt(z)].speedAt(z);
-}
+float speedAtZ(float z) { return regions[regionIndexAt(z)].speedAt(z); }
 
 // 演出の基準にする速度(最初のエリアの開始速度)。
 // 画角の広がりや走りの上下動を、これとの比で決めている。
 float baseSpeedRef() { return regions[0].baseSpeed; }
 
-// 地点 z の陸・海の色。
-// 区間の境目でいきなり色が変わると線が見えてしまうので、
-// REGION_BLEND_DIST の距離をかけて次の色へ混ぜる。
-color landColorAt(float z) { return blendRegionColor(z, true); }
-color seaColorAt(float z)  { return blendRegionColor(z, false); }
-
-color blendRegionColor(float z, boolean isLand) {
+// スタートからここまでに実際に走った距離。海の空白を飛ばして数える。
+// 進捗バーはこれを使う。z をそのまま使うと、船に乗った瞬間にバーが飛んでしまう。
+float runDistanceAt(float z) {
   int i = regionIndexAt(z);
-  Region cur = regions[i];
-  color c = isLand ? cur.land : cur.sea;
-
-  if (i + 1 >= regions.length) return c;   // 次のエリアが無ければ混ぜる相手がいない
-
-  Region next = regions[i + 1];
-  float toBoundary = next.startZ - z;
-  if (toBoundary > REGION_BLEND_DIST) return c;   // まだ遠い
-
-  float t = 1 - constrain(toBoundary / REGION_BLEND_DIST, 0, 1);
-  return lerpColor(c, isLand ? next.land : next.sea, t);
+  float d = 0;
+  for (int k = 0; k < i; k++) d += regions[k].length();
+  return d + constrain(z - regions[i].startZ, 0, regions[i].length());
 }

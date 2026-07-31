@@ -44,6 +44,17 @@ final color C_SIGN_MARK  = #CC2222;   // 板に描く「3レーン塞がって�
 
 final color C_GOAL       = #FFCC00;   // ゴールゲート
 
+// ---- 港と船 ----
+// ステージのゴールは港。ゴールゲートの先に桟橋があり、船が停まっている。
+// 船は目立つ色にしてある。遠くからでも「あそこがゴールだ」と分かる目印になるため。
+final color C_PIER        = #8A6A45;   // 桟橋の板
+final color C_PIER_POST   = #5E4830;   // 桟橋の杭
+final color C_SHIP_HULL   = #1F3D6B;   // 船体
+final color C_SHIP_DECK   = #E8E8EC;   // 甲板の建屋
+final color C_SHIP_CABIN  = #C8CCD4;   // 操舵室
+final color C_SHIP_FUNNEL = #C8422F;   // 煙突
+final color C_START_LINE  = #FFFFFF;   // スタートラインの白
+
 // ---- 血糖ゲージ ----
 // 低いほうから、濃紺 → 青 → 黄 → 緑 → 赤。
 // 低血糖側を青にしているのは、高血糖側の赤と一目で区別するため。

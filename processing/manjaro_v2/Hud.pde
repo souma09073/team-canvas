@@ -36,6 +36,7 @@ class Hud {
     shotPanel.draw(g);
     drawTime(g);
     drawRegionBanner(g);
+    drawPortApproach(g);
     drawFinalHint(g);
     drawWarnings(g);
     drawStopped(g);
@@ -60,11 +61,13 @@ class Hud {
   }
 
   // ---- 画面最上部の進捗バー ----
+  // 「実際に走った距離」で測る。z をそのまま使うと、エリアの間の海(走らない区間)まで
+  // 数えてしまい、船に乗った瞬間にバーが飛んでしまう。
   void drawProgress(Game g) {
     fill(0, 130);
     rect(0, 0, SCREEN_W, 7);
     fill(80, 230, 150);
-    rect(0, 0, SCREEN_W * constrain(g.z / COURSE_LENGTH, 0, 1), 7);
+    rect(0, 0, SCREEN_W * constrain(runDistanceAt(g.z) / RUN_LENGTH, 0, 1), 7);
   }
 
   // ---- 左上の血糖ゲージ ----
@@ -98,7 +101,7 @@ class Hud {
     if (g.foodPop > 0) {
       setText(fontSmall, 14);
       fill(C_NUM_FOOD);
-      text("+" + int(FOOD_GAIN), bx + 44, by + bh + 12);
+      text("+" + int(g.foodGain()), bx + 44, by + bh + 12);   // 上がり幅はエリアで違う
     }
   }
 
@@ -241,6 +244,27 @@ class Hud {
     setText(fontSmall, 14);
     fill(C_ACCENT, 220 * fade);
     text((g.regionIndex + 1) + " / " + regions.length, SCREEN_W * 0.5, 256);
+  }
+
+  // ---- 港の予告 ----
+  // ゴールゲートが見えてくるのと同じころに、港の名前を出す。
+  // 「ステージが終わる」ではなく「那覇港に着く」と伝えたい。
+  // 日本を北へ上がっていることが、地名の積み重ねで残るようにしている。
+  void drawPortApproach(Game g) {
+    if (g.state != STATE_RUNNING) return;
+
+    Region r = regions[g.regionIndex];
+    float sec = (r.endZ - g.z) / max(1, g.runSpeed());
+    if (sec < 0 || sec > PORT_NOTICE_SEC) return;
+
+    float fade = constrain(PORT_NOTICE_SEC - sec, 0, 1);   // 最後の1秒かけて出す
+
+    setText(fontMid, 22);
+    textAlign(CENTER, TOP);
+    fill(0, 150 * fade);
+    rect(SCREEN_W * 0.5 - 180, 612, 360, 42, 10);
+    fill(C_ACCENT, 255 * fade);
+    text("まもなく " + r.goalPort, SCREEN_W * 0.5, 621);
   }
 
   // ---- 終盤チャレンジの予告 ----

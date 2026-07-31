@@ -175,7 +175,11 @@ class Game {
     updateTimers(dt);         // 各種タイマーを進める
     updateZoneGauge(dt);      // ゾーンを溜める / 発動中なら減らす
     moveForward(dt);          // 前へ進む
-    updateRegion(dt);         // 次のエリアへ入ったか
+
+    // 港に着いたら、この先の当たり判定や血糖の判定はしない。
+    // ゴールした後で岩に当たった判定が出る、といったことを防ぐ。
+    if (updateRegion(dt)) return;
+
     revealWomen(dt);          // 女性が地面からせり上がる
     moveLane(dt);             // レーンの間を横に動く
 
@@ -210,8 +214,17 @@ class Game {
   boolean ferryIsRest() { return regions[ferryFromRegion].restAfter; }
 
   // 港を出発して次のエリアへ。自動の場合も Enter の場合もここを通る。
+  //
+  // ここで z を次のエリアの先頭へ飛ばす。エリアの間には海が空いていて、
+  // そこは走らないため。船に運ばれた、という扱い。
+  // レーンも真ん中に戻す(港に着いて、あらためて走り出すので)。
   void leaveFerry() {
     if (state != STATE_FERRY) return;
+
+    z = regions[regionIndex].startZ;
+    lane = 1;
+    x = laneToX(1);
+
     startCountdown();
   }
 
@@ -251,10 +264,17 @@ class Game {
   void updateGlucoseDrain(float dt) {
     if (isCollapsed()) return;   // 治療を受けている間は減らない
 
-    float base = (glucose > STABLE_MAX) ? DRAIN_PER_SEC_HIGH : DRAIN_PER_SEC;
+    float base = drainPerSec() * (glucose > STABLE_MAX ? DRAIN_HIGH_MULT : 1);
     float rate = base * (shotEffect > 0 ? SHOT_DRAIN_MULT : 1);
     glucose -= rate * dt;
   }
+
+  // ---- エリアごとの血糖の数値 ----
+  // 沖縄 +16/-8 から北海道 +28/-14 まで、エリアが進むほど振れ幅が大きくなる。
+  // 必要ペース(gain ÷ drain)はどのエリアも 2.0秒に1個で変わらない。
+  // 忙しさは同じまま、1回のミスの重さだけが増していく。
+  float foodGain()    { return regions[regionIndex].foodGain; }
+  float drainPerSec() { return regions[regionIndex].drainPerSec; }
 
   void updateTimers(float dt) {
     elapsed      += dt;
@@ -292,18 +312,21 @@ class Game {
   }
 
   // ---- エリア ----
-  // 次のエリアに入ったら、いったん港に着いて休憩に入る。
-  // 走りっぱなしにせず、ここで手を止めて成績を見せる。
-  void updateRegion(float dt) {
+  // ゴール(港)に着いたら、そこで走るのをやめて船に乗る。
+  // 最後のエリアだけは船が無く、そのままゲームのゴール(checkGoal が拾う)。
+  //
+  // 港に着いたら true を返す。呼び出し側はそこで残りの判定を打ち切る。
+  boolean updateRegion(float dt) {
     regionBanner = max(0, regionBanner - dt);
 
-    int now = regionIndexAt(z);
-    if (now == regionIndex) return;
+    if (regionIndex >= regions.length - 1) return false;   // 最終エリア。この先に港は無い
+    if (z < regions[regionIndex].endZ)     return false;   // まだ港に着いていない
 
     ferryFromRegion = regionIndex;   // 走り終えたエリア
-    regionIndex = now;
+    regionIndex++;
     state = STATE_FERRY;
     ferryTimer = FERRY_SEC;          // 自動で流れる回だけ使われる
+    return true;
   }
 
   // いま走っているエリアに入ってからの経過時間
@@ -342,7 +365,7 @@ class Game {
     for (Food f : course.foods) {
       if (f.eaten || !isTouching(f.z, f.lane)) continue;
       f.eaten = true;
-      glucose += FOOD_GAIN;
+      glucose += foodGain();
       foodPop = FOOD_POP_SEC;
       stageFoodCount++;
     }
@@ -428,25 +451,21 @@ class Game {
 
   float runSpeed() { return speedAtZ(z); }
 
-  // ゴールまでの残り秒数。速度は場所によって変わるので、
-  // コースを細かく区切って「その区間を何秒で走るか」を足し上げている。
+  // 最終ゴールまでの残り秒数。
+  // いま走っているエリアの残り + この先のエリア全部、を足す。
+  // エリアの間の海は走らないので数えない(船の時間もタイムに入らない)。
   float secondsToGoal() {
-    float remain = COURSE_LENGTH - z;
-    if (remain <= 0) return 0;
-
-    int steps = 24;
     float total = 0;
-    for (int i = 0; i < steps; i++) {
-      float sampleZ = z + remain * (i + 0.5f) / steps;
-      total += (remain / steps) / speedAtZ(sampleZ);
+    for (int i = regionIndex; i < regions.length; i++) {
+      total += regions[i].secondsFrom(i == regionIndex ? z : regions[i].startZ);
     }
     return total;
   }
 
   // ---- ハイスコア ----
-  // ファイル名にコース長を入れている。コース長を変えると記録が別枠になるので、
+  // ファイル名に走行距離を入れている。コースの長さを変えると記録が別枠になるので、
   // 旧コースの短いタイムが「二度と更新できないベスト」として残ることがない。
-  String bestPath() { return "best_" + int(COURSE_LENGTH) + ".txt"; }
+  String bestPath() { return "best_" + int(RUN_LENGTH) + ".txt"; }
 
   void loadBest() {
     bestTime = 0;

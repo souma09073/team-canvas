@@ -6,24 +6,24 @@
 // ┌─ よく使う早見表 ────────────────────────────────┐
 // │ 全体を速く / 遅く       → SPEED_SCALE(下にある。これ1つ) │
 // │ コースを短くしたい      → Regions.pde の targetSec を下げる │
-// │ メーターの動きを穏やかに→ FOOD_GAIN と DRAIN_PER_SEC を    │
-// │                           同じ倍率で下げる                 │
-// │ 低血糖で死にやすく      → DRAIN_PER_SEC を上げる           │
-// │ 高血糖で死にやすく      → DRAIN_PER_SEC_HIGH を下げる      │
+// │ 食べ物を減らしたい      → Regions.pde の .food(...) の      │
+// │                           間隔(秒)を大きくする            │
+// │ メーターの動きを穏やかに→ Regions.pde の .food(...) の      │
+// │                           上昇と減少を同じ倍率で下げる     │
 // │ 全体を易しく            → HYPER_GRACE_SEC を上げる         │
-// │ 食べ物を減らしたい      → SPARSE_GAP_MIN / MAX を上げる    │
+// │ 止まる時間を短く        → COLLAPSE_STOP_SEC / ROCK_STOP_SEC │
 // └────────────────────────────────────────────────┘
 //
-// 【注意1】FOOD_GAIN と DRAIN_PER_SEC はセットで考える。
-//   必要ペース = FOOD_GAIN ÷ DRAIN_PER_SEC 秒に1個(今は 20÷10 = 2.0秒)。
-//   両方を同じ倍率で変えれば、忙しさを変えずに跳ね方だけ調整できる。
+// 【注意1】エリアごとに変わる数値は Regions.pde にある。
+//   食べ物の間隔・血糖の上昇と減少・密集地帯の有無は、エリアが進むほど
+//   難しくなるよう表で組んであるので、そちらで調整する。
 //
 // 【注意2】STABLE_MAX を変えるときは、HYPER_THRESHOLD と HYPER_RESET_BELOW も
 //   同じ数字にする(3ヶ所セット)。
 //
 // 【注意3】高血糖で死ぬ条件:
-//   (100 - STABLE_MAX) ÷ DRAIN_PER_SEC_HIGH が HYPER_GRACE_SEC を超えると
-//   「振り切ったら確定死」になる。今は 35÷15 = 2.33秒 対 3秒 で、余裕0.67秒。
+//   (100 - STABLE_MAX) ÷ (減少 × DRAIN_HIGH_MULT) が HYPER_GRACE_SEC を超えると
+//   「振り切ったら確定死」になる。北海道(減少14)なら 35÷21 = 1.67秒 対 3秒。
 // ============================================================
 
 // ---- 画面 ----
@@ -54,15 +54,15 @@ final float PLAYER_IMG_HEIGHT = 3.4;
 final float BILLBOARD_TILT = 0;
 
 // ---- 血糖 ----
-// 必要ペース = FOOD_GAIN / DRAIN_PER_SEC 秒に1個(今は 20/10 = 2.0秒に1個)
-final float DRAIN_PER_SEC      = 10;    // 血糖の毎秒自然減少・通常時
-final float DRAIN_PER_SEC_HIGH = 15;    // 高血糖時の下がり方。小さいほど高血糖で死にやすい
+// 【食べ物の上昇幅と自然減少は Regions.pde にある】エリアごとに違うため。
+// 沖縄 +16/-8 → 北海道 +28/-14。必要ペースはどのエリアも 2.0秒に1個で同じだが、
+// 1回食べ損ねたときの落ち方・1回食べすぎたときの跳ね方が大きくなっていく。
+final float DRAIN_HIGH_MULT    = 1.5;   // 高血糖のときは減少が何倍になるか
 final float STABLE_MIN         = 35;    // 安定域(緑)の下限 = ゾーンが溜まる範囲の下限
 final float STABLE_MAX         = 65;    // 安定域(緑)の上限
 final float HYPER_THRESHOLD    = 65;    // これを超えると高血糖カウントダウン開始
 final float HYPER_GRACE_SEC    = 3;     // 猶予(秒)
 final float HYPER_RESET_BELOW  = 65;    // ここまで下げれば解除
-final float FOOD_GAIN          = 20;    // 食べ物1つの血糖上昇
 final float DANGER_ZONE        = 15;    // これ未満で低血糖の警告(青)
 
 // ---- 倒れたときの減速 ----
@@ -146,11 +146,12 @@ float laneChangeSpeed() { return LANE_CHANGE_BASE * SPEED_SCALE; }
 final float COLLECT_DIST      = 2.0;   // 当たり判定(前後方向)
 
 // ---- 食べ物の配置 ----
-// 原則、1列は最大2個(必ず逃げ道が1レーン残る)。例外は終盤の壁だけ。
-final float SPARSE_GAP_MIN   = 52;
-final float SPARSE_GAP_MAX   = 85;
-final float DENSE_ROW_SPACING = 50;    // 中盤の密集
-final float FINAL_ROW_SPACING = 65;    // 終盤のガントレット
+// 原則、1列は最大2個(必ず逃げ道が1レーン残る)。例外は壁だけ。
+//
+// 【まばら区間の間隔は Regions.pde にある】エリアごとに違うため。
+// 沖縄 0.50〜0.80秒 → 北海道 0.32〜0.50秒。
+// 距離ではなく秒で持っているので、速度を上げても「忙しさ」は設計どおりに保たれる。
+final float DENSE_ROW_SEC      = 0.34;  // 密集地帯の列の間隔(秒)
 final float DENSE_WEAVE_CHANCE = 0.7;  // 空きレーンが隣へ動く確率
 final int   DENSE_MAX_SAME_LANE = 2;   // 同じレーンが空き続けられる最大列数
 final float DENSE_WOMAN_CHANCE = 0.15; // 【中盤のみ】空きレーンに女性を置く確率
@@ -168,7 +169,7 @@ final float DENSE_WOMAN_CHANCE = 0.15; // 【中盤のみ】空きレーンに�
 // 壁を作るコードは消していない。true に戻せば復活する。
 final boolean USE_FOOD_WALL  = false;
 
-final float FINAL_WALL_AT    = 0.80;   // 【終盤のみ】3個並びの壁の位置(コース長に対する割合)
+// 壁は、密集地帯の最後の FINAL_WALL_ROWS 列に置かれる(USE_FOOD_WALL が true のとき)。
 final int   FINAL_WALL_ROWS  = 4;      // 壁の列数
 final int   FINAL_WOMAN_ROWS = 3;      // 壁の直前に置く「食べ物2個+空きレーンの女性」の列数
 final float FINAL_WARN_SEC   = 5;      // 終盤チャレンジの操作ヒントを何秒手前から出すか
@@ -186,11 +187,21 @@ final float SIGN_NEAR_SEC    = 2;
 
 final int   COURSE_SEED = 12345;      // 同じ数字なら毎回同じコース
 
-// ---- エリア(日本縦断の区間) ----
-// 区間の区切り位置と地名は Regions.pde の buildRegions() にある。
-final float REGION_BLEND_DIST = 260;   // 区間の境目で色を混ぜる距離。長いほどなだらかに変わる
-final float REGION_BANNER_SEC = 2.6;   // 区間に入ったとき地名を出しておく秒数
-final float GROUND_SLICE = 24;         // 地面を何units刻みで塗り分けるか。小さいほど色の変化が滑らか
+// ---- エリア(日本縦断のステージ) ----
+// エリアの構成・地名・港の名前・難易度は Regions.pde の buildRegions() にある。
+final float REGION_BANNER_SEC = 2.6;   // エリアに入ったとき地名を出しておく秒数
+
+// エリアとエリアの間に空ける海の長さ。
+// DRAW_DIST(420)より長くしてあるので、港に立っても次のエリアは見えない。
+// これがないと、船に乗る前から次の土地の道が見えてしまい、
+// 「同じ道の続きを走っているだけ」に見える。
+final float REGION_GAP = 900;
+
+// ---- 港 ----
+// ステージのゴールは港。ゴールゲートをくぐった先に桟橋があり、船が停泊している。
+final float PORT_DEPTH       = 34;   // ゴール地点から桟橋の先端までの長さ
+final float PORT_NOTICE_SEC  = 4;    // 「まもなく○○港」を何秒手前から出すか
+final float START_LINE_DEPTH = 2.5;  // スタートラインの帯の太さ
 
 // ---- 描画 ----
 final float DRAW_DIST = 420;   // これより遠いものは描かない(P3Dにフォグが無いので手前で消す)

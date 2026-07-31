@@ -85,17 +85,25 @@ class Screens {
     }
   }
 
-  // 「どこから、どこへ」を線と船で示す
+  // 「どの港から、どの港へ」を線と船で示す。
+  // 地名ではなく港の名前を大きく出す。走っていたのは陸で、いま渡っているのは海だと
+  // はっきりさせるため。
   void drawFerryRoute(Game g, Region done, Region next) {
     float y = 210;
     float x1 = SCREEN_W * 0.5 - 300, x2 = SCREEN_W * 0.5 + 300;
 
-    setText(fontMid, 22);
+    setText(fontMid, 24);
     textAlign(CENTER, CENTER);
     fill(255, 200);
-    text(done.name, x1, y - 55);
+    text(done.goalPort, x1, y - 58);
     fill(255);
-    text(next.name, x2, y - 55);
+    text(next.startPort, x2, y - 58);
+
+    // その港がどのエリアのものかを、小さく添える
+    setText(fontSmall, 14);
+    fill(255, 150);
+    text(done.name, x1, y - 32);
+    text(next.name, x2, y - 32);
 
     // 航路
     stroke(255, 70);

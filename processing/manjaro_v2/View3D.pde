@@ -75,43 +75,65 @@ class View3D {
 
   void drawWorld(Game g) {
     drawGround(g);
+    drawStartLine(g);
     drawLaneLines(g);
     drawSigns(g);
     drawFoods(g);
     drawRocks(g);
     drawWomen(g);
-    drawGoal(g);
+    drawPort(g);
     drawPlayer(g);
   }
 
   // ---- 地面 ----
   // 主人公の周りだけを板で描く。コース全体を描くと無駄が大きい。
   //
-  // 陸と海は、日本を縦断するにつれて色が変わる。
-  // 1枚の板で塗ると色を変えられないので、奥行き方向に細かく切って
-  // 1枚ずつその地点の色で塗っている。
+  // 【陸はエリアの中にしかない】その前後は一面の海になっている。
+  // だから道はスタート地点から始まり、港でぷつりと終わる。
+  // 「島から島へ、船で渡っている」ことが、地面だけで伝わるようにしている。
   void drawGround(Game g) {
-    float half = LANE_WIDTH * 1.5 + 1;
+    Region r = regions[g.regionIndex];
+    float half = LANE_WIDTH * 1.5 + 1;   // 道路の幅
+    float wide = half + 60;              // 陸と海を描く幅
     float zNear = g.z - CAM_BACK - 10;
     float zFar  = g.z + DRAW_DIST;
 
     noStroke();
 
-    // 道路はどこでも同じ色なので1枚でいい
+    // まず全面を海で塗る。陸のないところは、これがそのまま見える。
+    fill(r.sea);
+    flatQuad(-wide, wide, zNear, zFar, -0.04);
+
+    // 陸があるのは、スタート地点の少し手前から港の桟橋の先まで。
+    float landFrom = max(zNear, r.startZ - PORT_DEPTH);
+    float landTo   = min(zFar,  r.endZ   + PORT_DEPTH);
+    if (landTo <= landFrom) return;
+
+    fill(r.land);
+    flatQuad(-wide, -half, landFrom, landTo, -0.02);   // 道の左は陸(右は海のまま)
+
     fill(C_ROAD);
-    flatQuad(-half, half, zNear, zFar, 0);
+    flatQuad(-half, half, landFrom, landTo, 0);
+  }
 
-    // 陸と海は区間ごとに色が変わるので、細かく切って塗る。
-    // わずかに下げて道路と重ならないようにしている。
-    for (float z = zNear; z < zFar; z += GROUND_SLICE) {
-      float z2 = min(z + GROUND_SLICE, zFar);
-      float mid = (z + z2) * 0.5;   // その断片の代表点で色を決める
+  // ---- スタートライン ----
+  // 港に着いて、あらためてここから走り出す。
+  // 白黒の市松模様にしているのは、道路の白線と見間違えないようにするため。
+  void drawStartLine(Game g) {
+    Region r = regions[g.regionIndex];
+    float d = r.startZ - g.z;
+    if (d > DRAW_DIST || d < -40) return;   // 通り過ぎたら描かない
 
-      fill(landColorAt(mid));
-      flatQuad(-half - 60, -half, z, z2, -0.02);
+    float a = fadeAlpha(max(0, d));
+    if (a <= 0) return;
 
-      fill(seaColorAt(mid));
-      flatQuad(half, half + 60, z, z2, -0.02);
+    noStroke();
+    float half = LANE_WIDTH * 1.5;
+    float cell = (half * 2) / 6;
+    for (int i = 0; i < 6; i++) {
+      fill(i % 2 == 0 ? 255 : 40, a);
+      flatQuad(-half + i * cell, -half + (i + 1) * cell,
+               r.startZ, r.startZ + START_LINE_DEPTH, 0.02);
     }
   }
 
@@ -262,23 +284,81 @@ class View3D {
     }
   }
 
-  // ---- ゴールゲート ----
-  void drawGoal(Game g) {
-    if (!isVisible(COURSE_LENGTH, g.z) && COURSE_LENGTH - g.z > 0) return;
-    float a = fadeAlpha(COURSE_LENGTH - g.z);
+  // ============================================================
+  // 港(ステージのゴール)
+  //
+  // 【なぜ港なのか】
+  // 以前はエリアの境目に何も置いていなかったので、走っていると
+  // 「一度止まって、また同じところから走らされている」ように見えていた。
+  //
+  // ゴールゲート → 桟橋 → 停泊している船、と目に見える順番で並べることで、
+  // 「ここまで走りきった」「この船で次の土地へ渡る」の2つが絵として伝わる。
+  // 制限時間を入れるときも、この船が「出港時刻に間に合うか」の対象になる。
+  // ============================================================
+  void drawPort(Game g) {
+    Region r = regions[g.regionIndex];
+    float d = r.endZ - g.z;
+    if (d > DRAW_DIST || d < -PORT_DEPTH * 2) return;   // 遠すぎる / 通り過ぎた
+
+    float a = fadeAlpha(max(0, d));
     if (a <= 0) return;
 
     noStroke();
+    drawGoalGate(r.endZ, a);
+    drawPier(r.endZ, a);
+    drawShip(r.endZ + PORT_DEPTH * 0.7, a);
+  }
+
+  // ゴールゲート。ここをくぐった時点でそのステージは終わり。
+  void drawGoalGate(float z, float a) {
     fill(C_GOAL, a);
     for (int side = -1; side <= 1; side += 2) {
       pushMatrix();
-      translate(side * (LANE_WIDTH * 1.5 + 1), 4, COURSE_LENGTH);
+      translate(side * (LANE_WIDTH * 1.5 + 1), 4, z);
       box(0.6, 8, 0.6);
       popMatrix();
     }
     pushMatrix();
-    translate(0, 8, COURSE_LENGTH);
+    translate(0, 8, z);
     box(LANE_WIDTH * 3 + 4, 1, 0.6);
+    popMatrix();
+  }
+
+  // 桟橋。ゴールゲートの先、海へ突き出している板と杭。
+  void drawPier(float z, float a) {
+    fill(C_PIER, a);
+    pushMatrix();
+    translate(0, 0.15, z + PORT_DEPTH * 0.5);
+    box(LANE_WIDTH * 2.4, 0.3, PORT_DEPTH);
+    popMatrix();
+
+    fill(C_PIER_POST, a);
+    for (int i = 0; i < 4; i++) {
+      float pz = z + 5 + i * (PORT_DEPTH - 10) / 3.0;
+      for (int side = -1; side <= 1; side += 2) {
+        pushMatrix();
+        translate(side * LANE_WIDTH * 1.15, 0.9, pz);
+        box(0.5, 1.8, 0.5);
+        popMatrix();
+      }
+    }
+  }
+
+  // 停泊している船。桟橋の海側(右)に横付けしている。
+  // 遠くからでも見える大きさにしてあり、「あそこがゴールだ」の目印を兼ねる。
+  void drawShip(float z, float a) {
+    pushMatrix();
+    translate(LANE_WIDTH * 3.4, 0, z);
+
+    fill(C_SHIP_HULL, a);
+    pushMatrix(); translate(0, 1.8, 0);  box(9.0, 3.6, 26); popMatrix();   // 船体
+    fill(C_SHIP_DECK, a);
+    pushMatrix(); translate(0, 4.6, -2); box(7.0, 2.0, 14); popMatrix();   // 甲板の建屋
+    fill(C_SHIP_CABIN, a);
+    pushMatrix(); translate(0, 6.8, -5); box(5.5, 2.4, 7);  popMatrix();   // 操舵室
+    fill(C_SHIP_FUNNEL, a);
+    pushMatrix(); translate(0, 8.4, 2);  box(2.2, 3.6, 2.2); popMatrix();  // 煙突
+
     popMatrix();
   }
 

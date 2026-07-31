@@ -1,6 +1,10 @@
 // ============================================================
 // コースを作る。
 //
+// 【エリアごとに作る】沖縄・本州西・本州東・北海道を1つずつ組み立てる。
+// 食べ物の間隔も、密集地帯を置くかどうかも、エリアが自分で持っている
+// (Regions.pde の表)。このファイルは「どう並べるか」だけを決める。
+//
 // 【配置の原則】1列に置く食べ物は最大2個。必ず1レーンは空けておく。
 // 3個並べて絶対に避けられない場所を作ると、プレイヤーは理不尽に感じて面白くなくなる。
 //
@@ -68,23 +72,15 @@ class Rock {
   Rock(float z, int lane) { this.z = z; this.lane = lane; }
 }
 
-// 食べ物が密集する区間。中盤と終盤で役割を分けている。
+// 食べ物が密集する区間。
+// 位置は Regions.pde の .dense(from, to) で指定する。後半のエリアにだけ置いてある。
 class DenseZone {
-  float zFrom, zTo;     // コース全体に対する割合(0〜1)
-  float rowSpacing;     // 列の間隔。小さいほど密
-  float womanChance;    // 空きレーンに女性を置く確率
-  boolean hasWall;      // 3個並びの壁を置くか
+  float zFrom, zTo;     // 密集の開始・終了(コース上の実際の位置)
 
-  DenseZone(float zFrom, float zTo, float rowSpacing, float womanChance, boolean hasWall) {
+  DenseZone(float zFrom, float zTo) {
     this.zFrom = zFrom;
     this.zTo = zTo;
-    this.rowSpacing = rowSpacing;
-    this.womanChance = womanChance;
-    this.hasWall = hasWall;
   }
-
-  float startZ() { return COURSE_LENGTH * zFrom; }
-  float endZ()   { return COURSE_LENGTH * zTo; }
 }
 
 // ============================================================
@@ -105,18 +101,6 @@ class Course {
   int openLane = 1;        // いま空けているレーン
   int sameLaneCount = 0;   // 同じレーンを空け続けている列数
 
-  // 密集区間の定義。ここに行を足せば3ヶ所目・4ヶ所目が作れる。
-  DenseZone[] zones() {
-    return new DenseZone[] {
-      // 中盤:誘惑バースト。空きレーンに女性を置いて
-      // 「食べる / ぶつかる / 事前に消す」の三択を作る
-      new DenseZone(0.40f, 0.47f, DENSE_ROW_SPACING, DENSE_WOMAN_CHANCE, false),
-
-      // 終盤:最終ガントレット。マンジャロで消さないと抜けられない壁を1ヶ所だけ置く
-      new DenseZone(0.72f, 0.96f, FINAL_ROW_SPACING, 0f, true)
-    };
-  }
-
   void build() {
     foods.clear();
     women.clear();
@@ -127,27 +111,42 @@ class Course {
     challengeStart = -1;
 
     rng = new Rng(COURSE_SEED);
-    DenseZone[] zs = zones();
 
-    buildSparseSection(zs);
-    for (DenseZone d : zs) buildDenseZone(d);
-    buildRocks(zs);
+    // エリアごとに独立して作る。エリアの間の海には何も置かない。
+    for (Region r : regions) buildRegion(r);
+
     buildWallSigns();
+  }
+
+  // ============================================================
+  // 1エリアぶんのコース。
+  //
+  // 難易度の数値(食べ物の間隔・密集地帯の有無)はエリアが持っている。
+  // ここは「どう並べるか」だけを決め、「どれくらい詰めるか」は Regions.pde に任せる。
+  // ============================================================
+  void buildRegion(Region r) {
+    DenseZone d = r.denseZone();   // 密集地帯を設定していないエリアでは null
+    buildSparseSection(r, d);
+    if (d != null) buildDenseZone(r, d);
+    buildRocks(r, d);
   }
 
   // ============================================================
   // 岩(障害物)
   //
   // 【回避できることを必ず保証する】
-  // 密集区間には置かない。そこは2レーンが食べ物で埋まっているので、
+  // 密集地帯には置かない。そこは2レーンが食べ物で埋まっているので、
   // 残り1レーンに岩を置くと3レーン全部が塞がり、避けようがなくなる。
   // まばら区間でも、近くに食べ物があればそれとは違うレーンに置く。
+  //
+  // 間隔は距離(units)のまま。速いエリアほど同じ距離を短い時間で通るので、
+  // 後半ほど岩が次々に来る。これは意図した難易度上昇。
   // ============================================================
-  void buildRocks(DenseZone[] zs) {
-    float z = COURSE_START_CLEAR + ROCK_GAP_MIN;
+  void buildRocks(Region r, DenseZone d) {
+    float z = r.startZ + COURSE_START_CLEAR + ROCK_GAP_MIN;
 
-    while (z < COURSE_LENGTH - COURSE_END_CLEAR) {
-      if (!isInsideDenseZone(z, zs)) {
+    while (z < r.endZ - COURSE_END_CLEAR) {
+      if (!isInsideDenseZone(z, d)) {
         int lane = pickRockLane(z);
         if (lane >= 0) rocks.add(new Rock(z, lane));
       }
@@ -175,27 +174,31 @@ class Course {
   }
 
   // ============================================================
-  // まばら区間:コースの大半。一定間隔で1個ずつ置く。
+  // まばら区間:エリアの大半。一定間隔で1個ずつ置く。
+  //
+  // 【間隔は「秒」で決める】Region が持っている foodGapSec を、その地点の速度に
+  // 掛けて距離へ直している。距離で決めてしまうと、速いエリアほど食べ物が高速で
+  // 流れてきて、難しさが速度に引きずられる。秒で持てば「何秒に1個来るか」を
+  // 設計どおりに保てる。
   // ============================================================
-  void buildSparseSection(DenseZone[] zs) {
-    float z = COURSE_START_CLEAR;
+  void buildSparseSection(Region r, DenseZone d) {
+    float z = r.startZ + COURSE_START_CLEAR;
     int lastLane = -1;
 
-    while (z < COURSE_LENGTH - COURSE_END_CLEAR) {
-      if (!isInsideDenseZone(z, zs)) {
+    while (z < r.endZ - COURSE_END_CLEAR) {
+      if (!isInsideDenseZone(z, d)) {
         int lane = pickLaneAvoiding(lastLane);
         foods.add(new Food(z, lane));
         lastLane = lane;
       }
-      z += SPARSE_GAP_MIN + rng.next() * (SPARSE_GAP_MAX - SPARSE_GAP_MIN);
+      float gapSec = r.foodGapSecMin + rng.next() * (r.foodGapSecMax - r.foodGapSecMin);
+      z += gapSec * r.speedAt(z);
     }
   }
 
-  boolean isInsideDenseZone(float z, DenseZone[] zs) {
-    for (DenseZone d : zs) {
-      if (z >= d.startZ() - DENSE_EDGE_BUFFER && z <= d.endZ() + DENSE_EDGE_BUFFER) return true;
-    }
-    return false;
+  boolean isInsideDenseZone(float z, DenseZone d) {
+    if (d == null) return false;
+    return z >= d.zFrom - DENSE_EDGE_BUFFER && z <= d.zTo + DENSE_EDGE_BUFFER;
   }
 
   // 直前と同じレーンを候補から外して1つ選ぶ。
@@ -211,20 +214,24 @@ class Course {
   }
 
   // ============================================================
-  // 密集区間:一定間隔で「列」を作る。各列は1レーンだけ空ける。
+  // 密集地帯:一定間隔で「列」を作る。各列は1レーンだけ空ける。
+  //
+  // まばら区間が「拾いに行く」場所なのに対し、ここは「よけ続ける」場所。
+  // 空きレーンが左右に振れるので、追従できないと食べ物に突っ込んで高血糖になる。
+  // 後半のエリアにだけ置いてある(Regions.pde の .dense(...))。
   // ============================================================
-  void buildDenseZone(DenseZone d) {
+  void buildDenseZone(Region r, DenseZone d) {
     // 列の位置を先に全部並べる。壁は「何列目から何列目」で指定したいため。
-    // 割合から距離で直接計算すると列の刻みと揃わず、指定した列数どおりにならない。
+    // 列の間隔も秒で決める。まばら区間と同じ理由。
     ArrayList<Float> rowZs = new ArrayList<Float>();
-    for (float rz = d.startZ(); rz <= d.endZ(); rz += d.rowSpacing) rowZs.add(rz);
+    for (float rz = d.zFrom; rz <= d.zTo; rz += DENSE_ROW_SEC * r.speedAt(rz)) rowZs.add(rz);
 
     // 壁を作らない場合、wallFrom/wallTo はどの列にも当たらない値のまま残る。
     // その結果、壁の列も・壁の直前の女性も・予告看板も、まとめて発生しなくなる。
     int wallFrom = -1, wallTo = -2;
-    if (USE_FOOD_WALL && d.hasWall && rowZs.size() > 0) {
-      wallFrom = findWallStartRow(rowZs);
-      wallTo   = min(rowZs.size() - 1, wallFrom + FINAL_WALL_ROWS - 1);
+    if (USE_FOOD_WALL && rowZs.size() > FINAL_WALL_ROWS) {
+      wallFrom = rowZs.size() - FINAL_WALL_ROWS;   // 密集地帯の最後に置く
+      wallTo   = rowZs.size() - 1;
       wallStart = rowZs.get(wallFrom);
       wallEnd   = rowZs.get(wallTo);
 
@@ -243,23 +250,15 @@ class Course {
 
       boolean isWall = (i >= wallFrom && i <= wallTo);
       placeRow(rowZ, openLane, isWall);
-      placeRowWoman(d, rowZ, openLane, i, wallFrom, isWall);
+      placeRowWoman(rowZ, openLane, i, wallFrom, isWall);
     }
 
-    // 密集区間の手前に1体。「よけてから撃つか、撃ってから突っ込むか」の判断用。
+    // 密集地帯の手前に1体。「よけてから撃つか、撃ってから突っ込むか」の判断用。
     // 壁のある区間には置かない。ぶつかると7秒撃てず、ロック中に壁へ到達して
     // 回避不能になってしまうため。
-    if (!d.hasWall) {
-      women.add(new Woman(d.startZ() - WOMAN_LEAD_DIST, rng.nextInt(3)));
+    if (wallFrom < 0) {
+      women.add(new Woman(d.zFrom - WOMAN_LEAD_DIST, rng.nextInt(3)));
     }
-  }
-
-  // 壁を始める列を探す。見つからなければ先頭から。
-  int findWallStartRow(ArrayList<Float> rowZs) {
-    for (int i = 0; i < rowZs.size(); i++) {
-      if (rowZs.get(i) >= COURSE_LENGTH * FINAL_WALL_AT) return i;
-    }
-    return 0;
   }
 
   // 空きレーンを隣へ動かす。左右に振ることで、追従する操作が必要になる。
@@ -291,9 +290,9 @@ class Course {
   // 空きレーンに立つ女性。
   // 食べ物2個 + 空きレーンに女性 = 「食べる / ぶつかる / 事前に消す」の三択になる。
   // 終盤では壁の直前 FINAL_WOMAN_ROWS 列に必ず置く。
-  void placeRowWoman(DenseZone d, float rowZ, int openLane, int i, int wallFrom, boolean isWall) {
-    boolean isFinalWomanRow = d.hasWall && i >= wallFrom - FINAL_WOMAN_ROWS && i < wallFrom;
-    boolean isRandomWoman = !isWall && d.womanChance > 0 && rng.next() < d.womanChance;
+  void placeRowWoman(float rowZ, int openLane, int i, int wallFrom, boolean isWall) {
+    boolean isFinalWomanRow = wallFrom >= 0 && i >= wallFrom - FINAL_WOMAN_ROWS && i < wallFrom;
+    boolean isRandomWoman = !isWall && rng.next() < DENSE_WOMAN_CHANCE;
     if (isFinalWomanRow || isRandomWoman) women.add(new Woman(rowZ, openLane));
   }
 
