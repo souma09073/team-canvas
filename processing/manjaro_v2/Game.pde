@@ -60,9 +60,10 @@ class Game {
   float lock = 0;               // 女性に奪われて打てない残り
 
   // ---- ゾーン ----
-  float zoneGauge = 0;          // 0〜100
-  float zoneActive = 0;         // 発動中の残り
-  boolean zoneReady = false;    // 満タン。Zキー待ち
+  // コメントアウト: ゾーン機能を無効化
+  // float zoneGauge = 0;          // 0〜100
+  // float zoneActive = 0;         // 発動中の残り
+  // boolean zoneReady = false;    // 満タン。Zキー待ち
 
   // ---- エリア(日本縦断の区間) ----
   int regionIndex = 0;          // いま何番目の区間にいるか
@@ -84,7 +85,8 @@ class Game {
   // ---- 記録 ----
   int shotCount = 0;            // マンジャロを打った回数
   int robbedCount = 0;          // 奪われた回数
-  float zoneTotal = 0;          // ゾーンの合計時間
+  // コメントアウト: ゾーン機能を無効化
+  // float zoneTotal = 0;          // ゾーンの合計時間
   float bestTime = 0;           // ベストタイム。0 なら記録なし
   boolean newRecord = false;
 
@@ -100,11 +102,13 @@ class Game {
     collapseCount = 0;  rockHitCount = 0;
     shotUsedInRegion = new boolean[regions.length];   // エリアごとの使用権をリセット
     shotEffect = 0;  lock = 0;
-    zoneGauge = 0;  zoneActive = 0;  zoneReady = false;
+    // コメントアウト: ゾーン機能を無効化
+    // zoneGauge = 0;  zoneActive = 0;  zoneReady = false;
     shotFlash = 0;  foodPop = 0;
     regionIndex = 0;  ferryFromRegion = 0;
     ferryTimer = 0;
-    shotCount = 0;  robbedCount = 0;  zoneTotal = 0;  newRecord = false;
+    shotCount = 0;  robbedCount = 0;  // zoneTotal = 0;  newRecord = false;
+    newRecord = false;
     course.build();
 
     startCountdown();   // いきなり走り出さず、必ず構える時間を置く
@@ -150,13 +154,13 @@ class Game {
     shotCount++;
   }
 
-  // ゾーンは満タンになっても勝手には発動しない。切るタイミングは自分で決める。
-  void tryZone() {
-    if (state != STATE_RUNNING || !zoneReady) return;
-    zoneReady = false;
-    zoneGauge = 100;
-    zoneActive = ZONE_DURATION;
-  }
+  // コメントアウト: ゾーン機能を無効化
+  // void tryZone() {
+  //   if (state != STATE_RUNNING || !zoneReady) return;
+  //   zoneReady = false;
+  //   zoneGauge = 100;
+  //   zoneActive = ZONE_DURATION;
+  // }
 
   // ============================================================
   // 毎フレームの更新
@@ -180,7 +184,8 @@ class Game {
 
     updateGlucoseDrain(dt);   // 血糖が自然に減る
     updateTimers(dt);         // 各種タイマーを進める
-    updateZoneGauge(dt);      // ゾーンを溜める / 発動中なら減らす
+    // コメントアウト: ゾーン機能を無効化
+    // updateZoneGauge(dt);      // ゾーンを溜める / 発動中なら減らす
     moveForward(dt);          // 前へ進む
 
     // 港に着いたら、この先の当たり判定や血糖の判定はしない。
@@ -293,30 +298,31 @@ class Game {
   }
 
   // ---- ゾーンゲージ ----
-  // 緑の帯(=安定域)に居る間だけ溜まる。「安定を保った巧さ」への報酬なので、
-  // 高血糖や低血糖では溜まらない。
-  void updateZoneGauge(float dt) {
-    if (zoneActive > 0) {
-      zoneActive = max(0, zoneActive - dt);
-      zoneTotal += dt;
-      zoneGauge = (zoneActive / ZONE_DURATION) * 100;   // 発動中は残り時間を表す
-      return;
-    }
-    if (zoneReady) return;   // 満タン。発動待ちなので何もしない
-
-    boolean inBand = (glucose >= STABLE_MIN && glucose <= STABLE_MAX);
-    if (inBand) zoneGauge += ZONE_CHARGE_PER_SEC * dt;
-    else        zoneGauge -= ZONE_DECAY_PER_SEC * dt;   // 今は0。帯を外れても減らない
-    zoneGauge = constrain(zoneGauge, 0, 100);
-
-    if (zoneGauge >= 100) zoneReady = true;
-  }
+  // コメントアウト: ゾーン機能を無効化
+  // void updateZoneGauge(float dt) {
+  //   if (zoneActive > 0) {
+  //     zoneActive = max(0, zoneActive - dt);
+  //     zoneTotal += dt;
+  //     zoneGauge = (zoneActive / ZONE_DURATION) * 100;   // 発動中は残り時間を表す
+  //     return;
+  //   }
+  //   if (zoneReady) return;   // 満タン。発動待ちなので何もしない
+  //
+  //   boolean inBand = (glucose >= STABLE_MIN && glucose <= STABLE_MAX);
+  //   if (inBand) zoneGauge += ZONE_CHARGE_PER_SEC * dt;
+  //   else        zoneGauge -= ZONE_DECAY_PER_SEC * dt;   // 今は0。帯を外れても減らない
+  //   zoneGauge = constrain(zoneGauge, 0, 100);
+  //
+  //   if (zoneGauge >= 100) zoneReady = true;
+  // }
 
   // ---- 前進 ----
   // 速度を変える要素はゾーンだけ(食べた瞬間の加速はコントロールを失うので廃止)。
   // 止まっているときは update の冒頭で抜けるので、ここには来ない。
   void moveForward(float dt) {
-    z += runSpeed() * (zoneActive > 0 ? ZONE_SPEED_MULT : 1) * dt;
+    // コメントアウト: ゾーン機能を無効化
+    // z += runSpeed() * (zoneActive > 0 ? ZONE_SPEED_MULT : 1) * dt;
+    z += runSpeed() * dt;
   }
 
   // ---- エリア ----
@@ -383,7 +389,8 @@ class Game {
   // ゾーン中はすり抜ける(ゾーンの数少ない利点)。
   // 一度ぶつかった岩は二度は当たらない。
   void checkRockHit() {
-    if (zoneActive > 0) return;
+    // コメントアウト: ゾーン機能を無効化
+    // if (zoneActive > 0) return;
     for (Rock r : course.rocks) {
       if (r.hit || !isTouching(r.z, r.lane)) continue;
       r.hit = true;
@@ -395,7 +402,8 @@ class Game {
   // ぶつかると次の1本を奪われる。すでに消した食べ物は戻らない。
   // ゾーン中だけはすり抜けられる(ゾーンに残した唯一の無敵)。
   void checkWomanHit() {
-    if (zoneActive > 0) return;
+    // コメントアウト: ゾーン機能を無効化
+    // if (zoneActive > 0) return;
     for (Woman w : course.women) {
       if (w.hit || !isTouching(w.z, w.lane)) continue;
       w.hit = true;
@@ -474,7 +482,8 @@ class Game {
     }
 
     shotEffect = 0;  lock = 0;
-    zoneGauge = 0;  zoneActive = 0;  zoneReady = false;
+    // コメントアウト: ゾーン機能を無効化
+    // zoneGauge = 0;  zoneActive = 0;  zoneReady = false;
     shotFlash = 0;  foodPop = 0;
     regionBanner = 0;
     ferryFromRegion = checkpointRegionIndex;

@@ -33,7 +33,8 @@ class Hud {
     drawProgress(g);
     drawGlucose(g);
     drawMiniGauge(g);
-    drawZone(g);
+    // コメントアウト: ゾーンバーを非表示化
+    // drawZone(g);
     shotPanel.draw(g);
     drawTime(g);
     drawRegionBanner(g);
@@ -183,30 +184,31 @@ class Hud {
   }
 
   // ---- ゾーンゲージ ----
-  void drawZone(Game g) {
-    float px = 24, py = 118, pw = 300, ph = 46;
-    fill(0, 150);
-    rect(px, py, pw, ph, 10);
-
-    setText(fontSmall, 13);
-    textAlign(LEFT, TOP);
-    if (g.zoneActive > 0) {
-      fill(255, 204, 0);
-      text("ゾーン発動中! 残り " + nf(g.zoneActive, 1, 1) + " 秒", px + 14, py + 7);
-    } else if (g.zoneReady) {
-      fill(255, 204, 0);
-      text("ゾーン準備完了! Z キーで発動", px + 14, py + 7);
-    } else {
-      fill(255, 200);
-      text("ゾーン(緑をキープで蓄積)", px + 14, py + 7);
-    }
-
-    float bx = px + 14, by = py + 26, bw = pw - 28, bh = 10;
-    fill(60);
-    rect(bx, by, bw, bh, 5);
-    fill(255, 190, 40);
-    rect(bx, by, bw * (g.zoneGauge / 100), bh, 5);
-  }
+  // コメントアウト: ゾーンバーを非表示化
+  // void drawZone(Game g) {
+  //   float px = 24, py = 118, pw = 300, ph = 46;
+  //   fill(0, 150);
+  //   rect(px, py, pw, ph, 10);
+  //
+  //   setText(fontSmall, 13);
+  //   textAlign(LEFT, TOP);
+  //   if (g.zoneActive > 0) {
+  //     fill(255, 204, 0);
+  //     text("ゾーン発動中! 残り " + nf(g.zoneActive, 1, 1) + " 秒", px + 14, py + 7);
+  //   } else if (g.zoneReady) {
+  //     fill(255, 204, 0);
+  //     text("ゾーン準備完了! Z キーで発動", px + 14, py + 7);
+  //   } else {
+  //     fill(255, 200);
+  //     text("ゾーン(緑をキープで蓄積)", px + 14, py + 7);
+  //   }
+  //
+  //   float bx = px + 14, by = py + 26, bw = pw - 28, bh = 10;
+  //   fill(60);
+  //   rect(bx, by, bw, bh, 5);
+  //   fill(255, 190, 40);
+  //   rect(bx, by, bw * (g.zoneGauge / 100), bh, 5);
+  // }
 
   // ---- タイム・残り・ベスト ----
   void drawTime(Game g) {

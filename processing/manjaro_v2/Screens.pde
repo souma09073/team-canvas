@@ -48,8 +48,9 @@ class Screens {
        + "0で低血糖、" + int(HYPER_THRESHOLD) + "超で高血糖。どちらも倒れる。", SCREEN_W * 0.5, 320);
     text("スペースでマンジャロを打つと、" + int(SHOT_EFFECT_SEC) + "秒間 食べても血糖が上がらない。"
        + "ただし週1回の薬なので、エリアごとに1回しか打てない。", SCREEN_W * 0.5, 356);
-    text("緑をキープするとゾーンが溜まり、Zキーで超加速。"
-       + "終盤には消さないと抜けられない壁がある。", SCREEN_W * 0.5, 392);
+    // コメントアウト: ゾーン機能を無効化
+    // text("緑をキープするとゾーンが溜まり、Zキーで超加速。"
+    //    + "終盤には消さないと抜けられない壁がある。", SCREEN_W * 0.5, 392);
 
     setText(fontBig, 20);
     fill(C_ACCENT);
@@ -256,8 +257,7 @@ class Screens {
     fill(255, 230);
     text("マンジャロ " + g.shotCount + " / " + weeks + " 回"
        + "　　倒れた " + g.collapseCount + " 回"
-       + "　　岩 " + g.rockHitCount + " 回"
-       + "　　ゾーン " + nf(g.zoneTotal, 1, 1) + " 秒", SCREEN_W * 0.5, 285);
+       + "　　岩 " + g.rockHitCount + " 回", SCREEN_W * 0.5, 285);
   }
 
   // ---- このゲームの主題 ----

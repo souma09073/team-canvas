@@ -34,7 +34,7 @@ class View3D {
     float speedRatio = speedAtZ(g.z) / baseSpeedRef();   // 序盤1.0 → ゴール2.8
 
     // 速度が上がるほど画角を広げる。視界の端が流れてスピード感が出る。
-    float fov = FOV_BASE + (speedRatio - 1) * 10 + (g.zoneActive > 0 ? 12 : 0);
+    float fov = FOV_BASE + (speedRatio - 1) * 10;
     perspective(radians(fov), float(width) / float(height), 1, DRAW_DIST * 1.6);
 
     // 主人公の真後ろ上空から、少し前方を見る
