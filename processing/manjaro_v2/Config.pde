@@ -65,6 +65,21 @@ final float HYPER_RESET_BELOW  = 65;    // ここまで下げれば解除
 final float FOOD_GAIN          = 20;    // 食べ物1つの血糖上昇
 final float DANGER_ZONE        = 15;    // これ未満で低血糖の警告(青)
 
+// ---- 倒れたときの減速 ----
+// 血糖が振り切れても、以前のように即ゲームオーバーにはしない。
+// 一定時間だけ大きく減速し、治療を受けて走り続ける。
+//
+// 【この変更の理由】
+// ・やり直しを無くすと、失敗しても最後まで通しで遊べる(人に見せるときに効く)
+// ・タイムアタックなので「遅くなる」ことが十分な罰になる
+// ・先生から「休みをちょうだい」と言われており、即死の緊張を下げたい
+//
+// 失う時間 = COLLAPSE_SEC × (1 - COLLAPSE_SPEED_MULT)
+//          = 3.0 × 0.6 = 約1.8秒
+final float COLLAPSE_SEC        = 3.0;   // 減速している時間
+final float COLLAPSE_SPEED_MULT = 0.4;   // その間の速度(1.0で通常)
+final float COLLAPSE_GLUCOSE    = 50;    // 治療を受けて戻る血糖値
+
 // ---- マンジャロ(注射) ----
 final float SHOT_CLEAR_SEC  = 2.5;   // 前方「走行速度×この秒数」の食べ物を全レーン消去
 final float SHOT_COOLDOWN   = 7;     // 使用間隔(秒)。現実の投与間隔を再現している

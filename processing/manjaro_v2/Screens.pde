@@ -14,8 +14,8 @@ class Screens {
     rect(0, 0, SCREEN_W, SCREEN_H);
     textAlign(CENTER, CENTER);
 
+    // 「倒れた」画面は無い。血糖が振り切れても減速するだけで、走り続ける。
     if      (g.state == STATE_READY) drawTitle();
-    else if (g.state == STATE_OVER)  drawGameOver(g);
     else if (g.state == STATE_GOAL)  drawGoal(g);
   }
 
@@ -44,17 +44,6 @@ class Screens {
     text("ESC キーで終了", SCREEN_W * 0.5, 520);
   }
 
-  void drawGameOver(Game g) {
-    setText(fontBig, 34);
-    fill(255, 90, 90);
-    text(g.overTitle, SCREEN_W * 0.5, 240);
-
-    setText(fontSmall, 16);
-    fill(255);
-    text(g.overReason, SCREEN_W * 0.5, 300);
-    text("R キーでリトライ", SCREEN_W * 0.5, 360);
-  }
-
   void drawGoal(Game g) {
     setText(fontBig, 36);
     fill(255, 204, 0);
@@ -69,7 +58,8 @@ class Screens {
 
     setText(fontSmall, 15);
     fill(255);
-    text("マンジャロ " + g.shotCount + " 回(食べ物 " + g.clearedCount + " 個を消去)"
+    text("マンジャロ " + g.shotCount + " 回"
+       + "　倒れた " + g.collapseCount + " 回"
        + "　奪われ " + g.robbedCount + " 回"
        + "　ゾーン合計 " + nf(g.zoneTotal, 1, 1) + " 秒", SCREEN_W * 0.5, 360);
 

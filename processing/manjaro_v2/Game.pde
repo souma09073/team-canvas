@@ -10,11 +10,11 @@
 // この2つに挟まれた状態を保つのがこのゲームの中身。
 // ============================================================
 
-// ゲームの状態
+// ゲームの状態。
+// 「倒れた」状態は無い。血糖が振り切れても走り続け、減速するだけ(collapse)。
 final int STATE_READY   = 0;   // タイトル画面
 final int STATE_RUNNING = 1;   // 走行中
-final int STATE_OVER    = 2;   // 倒れた
-final int STATE_GOAL    = 3;   // ゴールした
+final int STATE_GOAL    = 2;   // ゴールした
 
 class Game {
   Course course = new Course();
@@ -30,6 +30,11 @@ class Game {
   // ---- 血糖 ----
   float glucose = 50;
   float hyperTimer = 0;         // 高血糖カウントダウンの残り。0なら発動していない
+
+  // ---- 倒れた(減速中) ----
+  float collapse = 0;           // 減速している残り時間。0なら通常走行
+  String collapseReason = "";   // 「高血糖」か「低血糖」か
+  int collapseCount = 0;        // 倒れた回数(成績に出す)
 
   // ---- マンジャロ ----
   float shotCooldown = 0;       // 次に打てるまでの残り(=投与間隔)
@@ -59,9 +64,6 @@ class Game {
   float bestTime = 0;           // ベストタイム。0 なら記録なし
   boolean newRecord = false;
 
-  String overTitle = "";        // 倒れたときの見出し
-  String overReason = "";       // その理由
-
   // ============================================================
   // 開始・入力
   // ============================================================
@@ -70,6 +72,7 @@ class Game {
     state = STATE_RUNNING;
     z = 0;  lane = 1;  x = laneToX(1);  elapsed = 0;
     glucose = 50;  hyperTimer = 0;
+    collapse = 0;  collapseReason = "";  collapseCount = 0;
     shotCooldown = 0;  shotEffect = 0;  lock = 0;  foodBlocked = false;
     zoneGauge = 0;  zoneActive = 0;  zoneReady = false;
     shotFlash = 0;  foodPop = 0;
@@ -138,16 +141,30 @@ class Game {
     checkWomanHit();          // 女性に当たったか
 
     checkHyperglycemia(dt);   // 高血糖のカウントダウン
-    if (state != STATE_RUNNING) return;   // ここで倒れていたら以降は見ない
-
-    checkGameEnd();           // 低血糖death / ゴール判定
+    checkHypoglycemia();      // 低血糖
+    checkGoal();              // ゴール判定
   }
+
+  // ---- 倒れる ----
+  // 以前は即ゲームオーバーだったが、減速に変えた。
+  // 治療を受けて血糖が戻り、そのまま走り続ける。失うのは時間だけ。
+  void doCollapse(String reason) {
+    collapse = COLLAPSE_SEC;
+    collapseReason = reason;
+    collapseCount++;
+    glucose = COLLAPSE_GLUCOSE;   // 治療を受けた
+    hyperTimer = 0;
+  }
+
+  boolean isCollapsed() { return collapse > 0; }
 
   // ---- 血糖の自然減少 ----
   // ゾーン中も普通に減る。ゾーンを安全地帯にすると、マンジャロを使う理由が消えるため。
   // マンジャロ効果中も止まらない。80%に緩めるだけ。
   // 完全に止めてしまうと「打てば安全」になり、薬の危険性が表現できなくなる。
   void updateGlucoseDrain(float dt) {
+    if (isCollapsed()) return;   // 治療を受けている間は減らない
+
     float base = (glucose > STABLE_MAX) ? DRAIN_PER_SEC_HIGH : DRAIN_PER_SEC;
     float rate = base * (shotEffect > 0 ? SHOT_DRAIN_MULT : 1);
     glucose -= rate * dt;
@@ -155,6 +172,7 @@ class Game {
 
   void updateTimers(float dt) {
     elapsed      += dt;
+    collapse      = max(0, collapse - dt);
     shotCooldown  = max(0, shotCooldown - dt);
     shotEffect    = max(0, shotEffect - dt);
     shotFlash     = max(0, shotFlash - dt);
@@ -183,9 +201,13 @@ class Game {
   }
 
   // ---- 前進 ----
-  // 速度を変える要素はゾーンだけ。食べた瞬間の加速はコントロールを失うので廃止した。
+  // 速度を変える要素は、ゾーン(速くなる)と 倒れた状態(遅くなる)の2つ。
+  // 食べた瞬間の加速はコントロールを失うので廃止した。
   void moveForward(float dt) {
-    z += runSpeed() * (zoneActive > 0 ? ZONE_SPEED_MULT : 1) * dt;
+    float mult = 1;
+    if (isCollapsed())      mult = COLLAPSE_SPEED_MULT;   // 倒れている間は大きく減速
+    else if (zoneActive > 0) mult = ZONE_SPEED_MULT;
+    z += runSpeed() * mult * dt;
   }
 
   // ---- エリア ----
@@ -255,10 +277,11 @@ class Game {
   }
 
   // ---- 高血糖 ----
-  // 上限を超えても即死はしない。猶予の間に下げられなければ倒れる。
-  // 「自分で下げる行動を取れば助かる / 取らなければ死ぬ」形にするための仕組み。
+  // 上限を超えても即座には倒れない。猶予の間に下げれば助かる。
+  // 「自分で下げる行動を取れば助かる / 取らなければ倒れる」形にするための仕組み。
   void checkHyperglycemia(float dt) {
     glucose = min(100, glucose);   // 上限は100で止める
+    if (isCollapsed()) return;     // 倒れている最中は数えない
 
     if (hyperTimer > 0) {
       if (glucose <= HYPER_RESET_BELOW) {
@@ -266,32 +289,26 @@ class Game {
         return;
       }
       hyperTimer -= dt;
-      if (hyperTimer <= 0) {
-        gameOver("高血糖", "血糖値を " + int(HYPER_GRACE_SEC) + " 秒以内に下げられなかった");
-      }
+      if (hyperTimer <= 0) doCollapse("高血糖");
       return;
     }
 
     if (glucose > HYPER_THRESHOLD) hyperTimer = HYPER_GRACE_SEC;   // カウントダウン開始
   }
 
-  void checkGameEnd() {
-    if (glucose <= 0) {
-      gameOver("低血糖", "血糖値が 0 になった(食べなさすぎ)");
-      return;
-    }
+  // ---- 低血糖 ----
+  void checkHypoglycemia() {
+    if (isCollapsed()) return;
+    if (glucose <= 0) doCollapse("低血糖");
+  }
+
+  void checkGoal() {
     if (z >= COURSE_LENGTH) goal();
   }
 
   // ============================================================
   // 終了処理
   // ============================================================
-
-  void gameOver(String type, String reason) {
-    state = STATE_OVER;
-    overTitle = type + "で倒れた!";
-    overReason = reason;
-  }
 
   void goal() {
     state = STATE_GOAL;

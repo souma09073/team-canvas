@@ -38,6 +38,7 @@ class Hud {
     drawRegionBanner(g);
     drawFinalHint(g);
     drawWarnings(g);
+    drawCollapse(g);
     screens.draw(g);
 
     end();
@@ -265,9 +266,29 @@ class Hud {
     text(msg, SCREEN_W * 0.5, 129);
   }
 
+  // ---- 倒れている間の表示 ----
+  // 何が起きたのか分からないまま遅くなるのが一番よくないので、
+  // 「倒れた」「治療を受けている」「だから遅い」を言葉で出す。
+  void drawCollapse(Game g) {
+    if (g.state != STATE_RUNNING || !g.isCollapsed()) return;
+
+    // 画面全体を沈める。倒れている実感と、警告の点滅を隠す役目も兼ねる。
+    fill(0, 120);
+    rect(0, 0, SCREEN_W, SCREEN_H);
+
+    setText(fontBig, 40);
+    textAlign(CENTER, CENTER);
+    fill(255, 90, 90);
+    text(g.collapseReason + "で倒れた", SCREEN_W * 0.5, SCREEN_H * 0.42);
+
+    setText(fontSmall, 17);
+    fill(255, 220);
+    text("治療を受けています…  " + nf(g.collapse, 1, 1) + " 秒", SCREEN_W * 0.5, SCREEN_H * 0.52);
+  }
+
   // ---- 血糖の危険警告 ----
   void drawWarnings(Game g) {
-    if (g.state != STATE_RUNNING) return;
+    if (g.state != STATE_RUNNING || g.isCollapsed()) return;   // 倒れている間は出さない
     float gv = constrain(g.glucose, 0, 100);
 
     if (g.hyperTimer > 0) {
