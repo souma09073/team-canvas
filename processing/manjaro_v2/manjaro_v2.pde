@@ -136,10 +136,8 @@ void keyPressed() {
     game.moveRight();
   } else if (key == ' ') {
     game.tryShot();
-  // コメントアウト: ゾーン機能を無効化
-  // } else if (key == 'z' || key == 'Z') {
-  //   game.tryZone();
-  // } else if (key == 'r' || key == 'R') {
+  } else if (key == 'z' || key == 'Z') {
+    game.trySpeedItem();
   } else if (key == 'r' || key == 'R') {
     game.restartFromCheckpoint();
   }

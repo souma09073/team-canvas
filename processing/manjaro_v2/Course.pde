@@ -72,6 +72,13 @@ class Rock {
   Rock(float z, int lane) { this.z = z; this.lane = lane; }
 }
 
+class SpeedItem {
+  float z;
+  int lane;
+  boolean picked = false;
+  SpeedItem(float z, int lane) { this.z = z; this.lane = lane; }
+}
+
 // 食べ物が密集する区間。
 // 位置は Regions.pde の .dense(from, to) で指定する。後半のエリアにだけ置いてある。
 class DenseZone {
@@ -90,6 +97,7 @@ class Course {
   ArrayList<Woman> women = new ArrayList<Woman>();
   ArrayList<Sign> signs = new ArrayList<Sign>();
   ArrayList<Rock> rocks = new ArrayList<Rock>();
+  ArrayList<SpeedItem> speedItems = new ArrayList<SpeedItem>();
 
   float wallStart = -1;        // 3個並びの壁の範囲
   float wallEnd = -1;
@@ -106,6 +114,7 @@ class Course {
     women.clear();
     signs.clear();
     rocks.clear();
+    speedItems.clear();
     wallStart = -1;
     wallEnd = -1;
     challengeStart = -1;
@@ -129,6 +138,7 @@ class Course {
     buildSparseSection(r, d);
     if (d != null) buildDenseZone(r, d);
     buildRocks(r, d);
+    buildSpeedItem(r);
   }
 
   // ============================================================
@@ -152,6 +162,38 @@ class Course {
       }
       z += ROCK_GAP_MIN + rng.next() * (ROCK_GAP_MAX - ROCK_GAP_MIN);
     }
+  }
+
+  void buildSpeedItem(Region r) {
+    float z = r.startZ + COURSE_START_CLEAR + 20 + rng.next() * max(1, r.length() - COURSE_START_CLEAR - COURSE_END_CLEAR - 20);
+    int lane = pickSpeedItemLane(z);
+    if (lane >= 0) speedItems.add(new SpeedItem(z, lane));
+  }
+
+  int pickSpeedItemLane(float z) {
+    boolean[] blocked = new boolean[3];
+    float near = COLLECT_DIST * 4;
+
+    for (Food f : foods) {
+      if (abs(f.z - z) < near) blocked[f.lane] = true;
+    }
+    for (Rock r : rocks) {
+      if (abs(r.z - z) < near) blocked[r.lane] = true;
+    }
+    for (Woman w : women) {
+      if (abs(w.z - z) < near) blocked[w.lane] = true;
+    }
+    for (SpeedItem s : speedItems) {
+      if (abs(s.z - z) < near) blocked[s.lane] = true;
+    }
+
+    int[] free = new int[3];
+    int n = 0;
+    for (int lane = 0; lane < 3; lane++) {
+      if (!blocked[lane]) free[n++] = lane;
+    }
+    if (n == 0) return -1;
+    return free[min(n - 1, (int)(rng.next() * n))];
   }
 
   // 岩を置けるレーンを選ぶ。近くの食べ物と同じレーンは避ける。

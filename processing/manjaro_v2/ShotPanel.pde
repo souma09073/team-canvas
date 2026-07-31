@@ -24,6 +24,7 @@ class ShotPanel {
     drawFrame(px, py, frameColor);
     drawLabels(g, px, py, frameColor);
     drawWeekMarks(g, px, py, frameColor);
+    drawSpeedItemIcon(g);
   }
 
   // 状態を色で表す。緑=打てる / 白=効いている / ピンク=奪われた / 灰=今週分は使用済み
@@ -77,6 +78,19 @@ class ShotPanel {
     textSize(11);
     fill(255, 150);
     text("週1回しか打てない薬", cx, py + 105);
+  }
+
+  void drawSpeedItemIcon(Game g) {
+    if (!g.speedItemHeld) return;
+
+    float ix = SCREEN_W - 64;
+    float iy = SCREEN_H * 0.7;
+    fill(0, 180);
+    rect(ix - 32, iy - 16, 64, 64, 8);
+    fill(C_ACCENT);
+    setText(fontMid, 16);
+    textAlign(CENTER, CENTER);
+    text("⚡", ix, iy + 1);
   }
 
   // エリアごとの使用権を、週の数だけ並べて見せる。

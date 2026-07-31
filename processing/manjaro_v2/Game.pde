@@ -59,6 +59,10 @@ class Game {
   float shotEffect = 0;         // 薬が効いている残り。この間は食べ物が無効になる
   float lock = 0;               // 女性に奪われて打てない残り
 
+  // ---- 加速アイテム ----
+  boolean speedItemHeld = false;  // 取得したら使用可能な状態になる
+  float speedItemActive = 0;      // 発動中の残り時間
+
   // ---- ゾーン ----
   // コメントアウト: ゾーン機能を無効化
   // float zoneGauge = 0;          // 0〜100
@@ -154,13 +158,11 @@ class Game {
     shotCount++;
   }
 
-  // コメントアウト: ゾーン機能を無効化
-  // void tryZone() {
-  //   if (state != STATE_RUNNING || !zoneReady) return;
-  //   zoneReady = false;
-  //   zoneGauge = 100;
-  //   zoneActive = ZONE_DURATION;
-  // }
+  void trySpeedItem() {
+    if (state != STATE_RUNNING || !speedItemHeld || speedItemActive > 0) return;
+    speedItemHeld = false;
+    speedItemActive = ZONE_DURATION;
+  }
 
   // ============================================================
   // 毎フレームの更新
@@ -196,6 +198,7 @@ class Game {
     moveLane(dt);             // レーンの間を横に動く
 
     checkFoodPickup();        // 食べ物に当たったか
+    checkSpeedItemPickup();   // 加速アイテムを拾ったか
     checkRockHit();           // 岩に当たったか
     checkWomanHit();          // 女性に当たったか
 
@@ -295,6 +298,7 @@ class Game {
     shotFlash     = max(0, shotFlash - dt);
     lock          = max(0, lock - dt);
     foodPop       = max(0, foodPop - dt);
+    speedItemActive = max(0, speedItemActive - dt);
   }
 
   // ---- ゾーンゲージ ----
@@ -320,9 +324,8 @@ class Game {
   // 速度を変える要素はゾーンだけ(食べた瞬間の加速はコントロールを失うので廃止)。
   // 止まっているときは update の冒頭で抜けるので、ここには来ない。
   void moveForward(float dt) {
-    // コメントアウト: ゾーン機能を無効化
-    // z += runSpeed() * (zoneActive > 0 ? ZONE_SPEED_MULT : 1) * dt;
-    z += runSpeed() * dt;
+    float mult = speedItemActive > 0 ? ZONE_SPEED_MULT : 1;
+    z += runSpeed() * mult * dt;
   }
 
   // ---- エリア ----
@@ -382,6 +385,18 @@ class Game {
       glucose += foodGain();
       foodPop = FOOD_POP_SEC;
       stageFoodCount++;
+    }
+  }
+
+  // ---- 加速アイテム ----
+  void checkSpeedItemPickup() {
+    if (speedItemHeld) return;
+
+    for (SpeedItem item : course.speedItems) {
+      if (item.picked || !isTouching(item.z, item.lane)) continue;
+      item.picked = true;
+      speedItemHeld = true;
+      break;
     }
   }
 

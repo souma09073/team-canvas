@@ -79,6 +79,7 @@ class View3D {
     drawLaneLines(g);
     drawSigns(g);
     drawFoods(g);
+    drawSpeedItems(g);
     drawRocks(g);
     drawWomen(g);
     drawPort(g);
@@ -186,6 +187,25 @@ class View3D {
       translate(laneToX(f.lane), 1.0, f.z);
       fill(blocked ? C_FOOD_BLOCKED : C_FOOD, blocked ? a * 0.55 : a);
       sphere(0.8);
+      popMatrix();
+    }
+  }
+
+  // ---- 加速アイテム ----
+  void drawSpeedItems(Game g) {
+    noStroke();
+    for (SpeedItem item : g.course.speedItems) {
+      if (item.picked || !isVisible(item.z, g.z)) continue;
+      float a = fadeAlpha(item.z - g.z);
+      if (a <= 0) continue;
+
+      pushMatrix();
+      translate(laneToX(item.lane), 1.2, item.z);
+      fill(C_SPEED_ITEM, a);
+      sphere(0.65);
+      fill(255, a * 0.85);
+      translate(0, 0.1, 0);
+      sphere(0.28);
       popMatrix();
     }
   }
