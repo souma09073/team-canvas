@@ -199,14 +199,18 @@ class View3D {
       float a = fadeAlpha(item.z - g.z);
       if (a <= 0) continue;
 
-      pushMatrix();
-      translate(laneToX(item.lane), 1.2, item.z);
-      fill(C_SPEED_ITEM, a);
-      sphere(0.65);
-      fill(255, a * 0.85);
-      translate(0, 0.1, 0);
-      sphere(0.28);
-      popMatrix();
+      if (assets.energy != null) {
+        billboard(assets.energy, laneToX(item.lane), 1.4, item.z, 1.2, a);
+      } else {
+        pushMatrix();
+        translate(laneToX(item.lane), 1.2, item.z);
+        fill(C_SPEED_ITEM, a);
+        sphere(0.65);
+        fill(255, a * 0.85);
+        translate(0, 0.1, 0);
+        sphere(0.28);
+        popMatrix();
+      }
     }
   }
 
@@ -401,6 +405,7 @@ class View3D {
     // 光を切って、絵の色をそのまま出す。
     // 切らないと 3Dの照明が掛かって、鮮やかな緑が暗いオリーブ色に濁る。
     noLights();
+    textureMode(IMAGE);
 
     tint(255, alpha);
     noStroke();

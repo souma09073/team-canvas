@@ -18,13 +18,16 @@ class Assets {
   PImage woman;
   PImage sky;
   PImage title;
+  PImage energy;
 
   void load() {
     player = tryLoad("images/player.png");
     food   = tryLoad("images/food.png");
     woman  = tryLoad("images/woman.png");
     sky    = tryLoad("images/sky.png");
-    title   = tryLoad("images/title.png");
+    title  = tryLoad("images/title.png");
+    energy = tryLoad("images/energy.png");
+    if (energy == null) energy = tryLoad(dataPath("images/energy.png"));
   }
 
   // 読めなければ null を返す。エラーで止めない。

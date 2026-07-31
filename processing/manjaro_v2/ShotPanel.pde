@@ -87,10 +87,17 @@ class ShotPanel {
     float iy = SCREEN_H * 0.7;
     fill(0, 180);
     rect(ix - 32, iy - 16, 64, 64, 8);
-    fill(C_ACCENT);
-    setText(fontMid, 16);
-    textAlign(CENTER, CENTER);
-    text("⚡", ix, iy + 1);
+    if (assets.energy != null) {
+      imageMode(CORNER);
+      tint(255);
+      image(assets.energy, ix - 30, iy - 20, 60, 60);
+      noTint();
+    } else {
+      fill(C_ACCENT);
+      setText(fontMid, 16);
+      textAlign(CENTER, CENTER);
+      text("⚡", ix, iy + 1);
+    }
   }
 
   // エリアごとの使用権を、週の数だけ並べて見せる。
