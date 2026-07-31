@@ -102,6 +102,11 @@ void keyPressed() {
     if (key == ENTER || key == RETURN) game.reset();
     return;
   }
+  if (game.state == STATE_FERRY) {
+    if (key == ENTER || key == RETURN) game.leaveFerry();
+    if (key == 'r' || key == 'R') game.reset();
+    return;
+  }
   if (keyCode == LEFT || key == 'a' || key == 'A') {
     game.moveLeft();
   } else if (keyCode == RIGHT || key == 'd' || key == 'D') {
@@ -117,4 +122,5 @@ void keyPressed() {
 
 void mousePressed() {
   if (game.state == STATE_READY) game.reset();
+  else if (game.state == STATE_FERRY) game.leaveFerry();
 }

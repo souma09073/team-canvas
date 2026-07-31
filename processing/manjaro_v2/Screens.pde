@@ -16,6 +16,7 @@ class Screens {
 
     // 「倒れた」画面は無い。血糖が振り切れても減速するだけで、走り続ける。
     if      (g.state == STATE_READY) drawTitle();
+    else if (g.state == STATE_FERRY) drawFerry(g);
     else if (g.state == STATE_GOAL)  drawGoal(g);
   }
 
@@ -42,6 +43,63 @@ class Screens {
     setText(fontSmall, 13);
     fill(255, 150);
     text("ESC キーで終了", SCREEN_W * 0.5, 520);
+  }
+
+  // ---- フェリー ----
+  // エリアの区切りで手を止める休憩画面。
+  // 企画書の「ステージ間はフェリー移動」をそのまま使っている。
+  // ここで一度緊張を切らないと、走りっぱなしで疲れる(先生の指摘)。
+  void drawFerry(Game g) {
+    Region done = regions[g.ferryFromRegion];
+    Region next = regions[g.regionIndex];
+
+    setText(fontBig, 30);
+    fill(C_ACCENT);
+    text("⛴  " + done.name + " を走り終えた", SCREEN_W * 0.5, 150);
+
+    // そのエリアの成績
+    setText(fontBig, 40);
+    fill(255);
+    text(nf(g.stageTime(), 1, 2) + " 秒", SCREEN_W * 0.5, 225);
+
+    setText(fontSmall, 16);
+    fill(255, 220);
+    text("食べた " + g.stageFoodCount + " 回"
+       + "　　マンジャロ " + (g.shotUsedInRegion[g.ferryFromRegion] ? "使用した" : "使わなかった"),
+       SCREEN_W * 0.5, 285);
+
+    // 到着時の血糖。医師との約束を守れているかが分かる
+    drawArrivalGlucose(g);
+
+    // 次の土地
+    stroke(255, 60);
+    strokeWeight(1);
+    line(SCREEN_W * 0.5 - 220, 430, SCREEN_W * 0.5 + 220, 430);
+    noStroke();
+
+    setText(fontMid, 22);
+    fill(255, 230);
+    text("次は  " + next.name, SCREEN_W * 0.5, 480);
+
+    setText(fontSmall, 14);
+    fill(255, 180);
+    text("マンジャロは新しい週の分が使える", SCREEN_W * 0.5, 520);
+
+    setText(fontBig, 22);
+    fill(C_ACCENT);
+    text("Enter で出港", SCREEN_W * 0.5, 590);
+  }
+
+  // 到着時の血糖が安定域に入っていたか。
+  // 「血糖を安定させ続けること」が医師との約束なので、そこを都度突きつける。
+  void drawArrivalGlucose(Game g) {
+    boolean stable = (g.glucose >= STABLE_MIN && g.glucose <= STABLE_MAX);
+
+    setText(fontMid, 20);
+    fill(stable ? C_GLU_STABLE : C_GLU_HIGH);
+    text(stable ? "到着時の血糖 " + int(g.glucose) + " … 安定域を保てた"
+                : "到着時の血糖 " + int(g.glucose) + " … 安定域を外れている",
+         SCREEN_W * 0.5, 350);
   }
 
   void drawGoal(Game g) {

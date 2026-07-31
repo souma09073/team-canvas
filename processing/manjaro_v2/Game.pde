@@ -14,7 +14,8 @@
 // 「倒れた」状態は無い。血糖が振り切れても走り続け、減速するだけ(collapse)。
 final int STATE_READY   = 0;   // タイトル画面
 final int STATE_RUNNING = 1;   // 走行中
-final int STATE_GOAL    = 2;   // ゴールした
+final int STATE_FERRY   = 2;   // 港。次のエリアへ渡る前の休憩
+final int STATE_GOAL    = 3;   // ゴールした
 
 class Game {
   Course course = new Course();
@@ -51,6 +52,13 @@ class Game {
   int regionIndex = 0;          // いま何番目の区間にいるか
   float regionBanner = 0;       // 地名を表示しておく残り時間
 
+  // ---- フェリー(エリアの区切りで入る休憩) ----
+  // 先生から「なんでもいいからユーザーの休みをちょうだい」と2回言われた点への対応。
+  // エリアの境目で一度手を止め、そこまでの成績を見せる。
+  int ferryFromRegion = 0;      // どのエリアを走り終えたか
+  float stageStartTime = 0;     // そのエリアに入った時刻(区間タイムを出すため)
+  int stageFoodCount = 0;       // そのエリアで食べた数
+
   // ---- 演出用のタイマー(ルールには影響しない) ----
   float shotFlash = 0;          // 打った瞬間の表示
   float foodPop = 0;            // 食べた瞬間の表示
@@ -77,6 +85,7 @@ class Game {
     shotFlash = 0;  foodPop = 0;
     regionIndex = 0;
     regionBanner = REGION_BANNER_SEC;   // 出発地(沖縄)の名前を最初に出す
+    ferryFromRegion = 0;  stageStartTime = 0;  stageFoodCount = 0;
     shotCount = 0;  robbedCount = 0;  zoneTotal = 0;  newRecord = false;
     course.build();
   }
@@ -205,16 +214,30 @@ class Game {
   }
 
   // ---- エリア ----
-  // 区間が変わったら地名を出す。「いま日本のどこを走っているか」を伝えるため。
+  // 次のエリアに入ったら、いったん港に着いて休憩に入る。
+  // 走りっぱなしにせず、ここで手を止めて成績を見せる。
   void updateRegion(float dt) {
     regionBanner = max(0, regionBanner - dt);
 
     int now = regionIndexAt(z);
-    if (now != regionIndex) {
-      regionIndex = now;
-      regionBanner = REGION_BANNER_SEC;
-    }
+    if (now == regionIndex) return;
+
+    ferryFromRegion = regionIndex;   // 走り終えたエリア
+    regionIndex = now;
+    state = STATE_FERRY;
   }
+
+  // 港を出発して次のエリアへ。フェリー画面から呼ばれる。
+  void leaveFerry() {
+    if (state != STATE_FERRY) return;
+    state = STATE_RUNNING;
+    regionBanner = REGION_BANNER_SEC;   // 新しい土地の名前を出す
+    stageStartTime = elapsed;
+    stageFoodCount = 0;
+  }
+
+  // いま走っているエリアに入ってからの経過時間
+  float stageTime() { return elapsed - stageStartTime; }
 
   // ---- 女性のせり上がり ----
   // 「何units手前」ではなく「何秒手前」で出す。
@@ -251,6 +274,7 @@ class Game {
       f.eaten = true;
       glucose += FOOD_GAIN;
       foodPop = FOOD_POP_SEC;
+      stageFoodCount++;
     }
   }
 
