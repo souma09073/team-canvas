@@ -156,12 +156,14 @@ class Game {
     shotEffect = SHOT_EFFECT_SEC;
     shotFlash = 0.35;
     shotCount++;
+    playOneShot(soundGetManjaro);
   }
 
   void trySpeedItem() {
     if (state != STATE_RUNNING || !speedItemHeld || speedItemActive > 0) return;
     speedItemHeld = false;
     speedItemActive = ZONE_DURATION;
+    playOneShot(soundBoost);
   }
 
   // ============================================================
@@ -385,6 +387,7 @@ class Game {
       glucose += f.gain;
       foodPop = FOOD_POP_SEC;
       stageFoodCount++;
+      playFoodSound();
     }
   }
 
@@ -470,10 +473,17 @@ class Game {
   }
 
   void restartFromCheckpoint() {
+    playOneShot(soundRetry);
     if (regions == null || regions.length == 0) { reset(); return; }
 
-    if (checkpointRegionIndex < 0 || checkpointRegionIndex >= regions.length) {
+    // ゴール後のリトライは、第1区画の最初へ戻す。
+    if (state == STATE_GOAL) {
       checkpointRegionIndex = 0;
+      checkpointElapsed = 0;
+    } else {
+      if (checkpointRegionIndex < 0 || checkpointRegionIndex >= regions.length) {
+        checkpointRegionIndex = 0;
+      }
     }
 
     z = regions[checkpointRegionIndex].startZ;
@@ -512,6 +522,7 @@ class Game {
 
   void gameOver() {
     state = STATE_GAME_OVER;
+    playOneShot(soundGameOver);
   }
 
   // ============================================================
@@ -520,6 +531,7 @@ class Game {
 
   void goal() {
     state = STATE_GOAL;
+    playOneShot(soundClear);
     newRecord = (bestTime <= 0 || elapsed < bestTime);
     if (newRecord) {
       bestTime = elapsed;

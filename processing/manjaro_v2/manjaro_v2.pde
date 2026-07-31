@@ -31,6 +31,10 @@ View3D view;
 Hud hud;
 Assets assets;
 
+String currentBgMusic = "";
+boolean footstepsPlaying = false;
+boolean seaPlaying = false;
+
 void settings() {
   if (FULLSCREEN) {
     // 画面いっぱいに開く。どんな解像度・表示倍率のPCでも必ず収まる。
@@ -92,10 +96,138 @@ void setup() {
   soundBoost = new SoundFile(this, "sounds/超高速ダッシュ.mp3");//加速する
   soundRetry = new SoundFile(this, "sounds/決定ボタンを押す33.mp3");//リトライ音
 
+  float masterVol = 0.25;
+  soundPlayMusic1.amp(masterVol);
+  soundPlayMusic2.amp(masterVol);
+  soundPlayMusic3.amp(masterVol);
+  soundPlayMusic4.amp(masterVol);
+  soundPlayMusic5.amp(masterVol);
+  soundRunning.amp(masterVol);
+  soundBoost.amp(masterVol);
+  soundRetry.amp(masterVol);
+  soundGameOver.amp(masterVol);
+  soundClear.amp(masterVol);
+  soundMovingSea.amp(masterVol);
+  soundGetManjaro.amp(masterVol);
+  soundHealthMax.amp(masterVol);
+  soundEat1.amp(masterVol);
+  soundEat2.amp(masterVol);
+  soundScreenTransition.amp(masterVol);
+
 }
 
 int lastMillis = 0;
 int lastW = 0, lastH = 0;   // ウィンドウの大きさ。変わったら表示倍率を計算し直す
+
+void updateAudioPlayback() {
+  if (game == null) return;
+
+  if (game.state == STATE_TITLE) {
+    setBackgroundMusic("title");
+    stopFootsteps();
+    stopSeaSound();
+    return;
+  }
+
+  if (game.state == STATE_FERRY) {
+    stopBackgroundMusic();
+    startSeaSound();
+    stopFootsteps();
+    return;
+  }
+
+  if (game.state == STATE_GAME_OVER || game.state == STATE_GOAL) {
+    stopBackgroundMusic();
+    stopSeaSound();
+    stopFootsteps();
+    return;
+  }
+
+  if (game.state == STATE_COUNTDOWN || game.state == STATE_RUNNING) {
+    setBackgroundMusic(regionMusicName(game.regionIndex));
+    if (game.state == STATE_RUNNING && !game.isStopped()) {
+      startFootsteps();
+    } else {
+      stopFootsteps();
+    }
+    stopSeaSound();
+    return;
+  }
+
+  stopBackgroundMusic();
+  stopSeaSound();
+  stopFootsteps();
+}
+
+void setBackgroundMusic(String name) {
+  if (name == null || name.equals(currentBgMusic)) return;
+  stopBackgroundMusic();
+  currentBgMusic = name;
+
+  if (name.equals("title")) {
+    soundPlayMusic1.loop();
+  } else if (name.equals("region1")) {
+    soundPlayMusic2.loop();
+  } else if (name.equals("region2")) {
+    soundPlayMusic4.loop();
+  } else if (name.equals("region3")) {
+    soundPlayMusic5.loop();
+  } else if (name.equals("region4")) {
+    soundPlayMusic3.loop();
+  }
+}
+
+String regionMusicName(int regionIndex) {
+  switch(regionIndex) {
+    case 0: return "region1";
+    case 1: return "region2";
+    case 2: return "region3";
+    case 3: return "region4";
+    default: return "region1";
+  }
+}
+
+void stopBackgroundMusic() {
+  if (currentBgMusic.equals("title")) soundPlayMusic1.stop();
+  else if (currentBgMusic.equals("region1")) soundPlayMusic2.stop();
+  else if (currentBgMusic.equals("region2")) soundPlayMusic4.stop();
+  else if (currentBgMusic.equals("region3")) soundPlayMusic5.stop();
+  else if (currentBgMusic.equals("region4")) soundPlayMusic3.stop();
+  currentBgMusic = "";
+}
+
+void startFootsteps() {
+  if (footstepsPlaying) return;
+  soundRunning.loop();
+  footstepsPlaying = true;
+}
+
+void stopFootsteps() {
+  if (!footstepsPlaying) return;
+  soundRunning.stop();
+  footstepsPlaying = false;
+}
+
+void startSeaSound() {
+  if (seaPlaying) return;
+  soundMovingSea.loop();
+  seaPlaying = true;
+}
+
+void stopSeaSound() {
+  if (!seaPlaying) return;
+  soundMovingSea.stop();
+  seaPlaying = false;
+}
+
+void playOneShot(SoundFile s) {
+  if (s != null) s.play();
+}
+
+void playFoodSound() {
+  if (random(1) < 0.5) playOneShot(soundEat1);
+  else playOneShot(soundEat2);
+}
 
 void draw() {
   // ウィンドウをドラッグで広げたときにもレイアウトを追従させる
@@ -115,6 +247,7 @@ void draw() {
   dt = min(0.05, dt);   // タブ切替などで巨大な dt が入るのを防ぐ
 
   game.update(dt);
+  updateAudioPlayback();
 
   background(135, 206, 235);
   view.apply(game);
