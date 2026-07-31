@@ -44,6 +44,13 @@ class View3D {
       0, -1, 0                                  // 上の向き(+Yを上にするため)
     );
 
+    applySceneLights();
+  }
+
+  // 球や箱に立体感を出すための光。
+  // ビルボード(絵)には掛けない。イラストは陰影が描き込まれているので、
+  // さらに光を掛けると色が濁って暗くなる。
+  void applySceneLights() {
     ambientLight(150, 150, 155);
     directionalLight(120, 120, 115, -0.3, 0.8, 0.5);
   }
@@ -237,19 +244,83 @@ class View3D {
     popMatrix();
   }
 
-  // ---- 主人公 ----
-  // 球(胴体)+ 球(頭)+ 箱(帽子)。3Dモデルは使っていない。
-  void drawPlayer(Game g) {
-    noStroke();
-    pushMatrix();
+  // ============================================================
+  // ビルボード(板に絵を貼る)
+  //
+  // このゲームはカメラが主人公の真後ろに固定で、一度も回転しない。
+  // だから板は常に正面を向いていて、向きを合わせる計算が要らない。
+  // 板を立てて絵を貼るだけでいい。
+  //
+  // 原点は「足元」。そこから上へ h の高さに立てる。
+  // ============================================================
+  void billboard(PImage img, float x, float y, float z, float h, float alpha) {
+    float w = h * img.width / float(img.height);   // 縦横比は元画像のまま
 
+    pushMatrix();
+    translate(x, y, z);
+    if (BILLBOARD_TILT != 0) rotateX(radians(BILLBOARD_TILT));
+
+    // 光を切って、絵の色をそのまま出す。
+    // 切らないと 3Dの照明が掛かって、鮮やかな緑が暗いオリーブ色に濁る。
+    noLights();
+
+    tint(255, alpha);
+    noStroke();
+    beginShape(QUAD);
+    texture(img);
+    // UV は既定の IMAGE モードなのでピクセル単位で指定する。
+    // 画像の上端(v=0)が板の上(y=h)に来る。
+    vertex(-w * 0.5, h, 0, 0,         0);
+    vertex( w * 0.5, h, 0, img.width, 0);
+    vertex( w * 0.5, 0, 0, img.width, img.height);
+    vertex(-w * 0.5, 0, 0, 0,         img.height);
+    endShape();
+    noTint();
+
+    popMatrix();
+    applySceneLights();   // 次に描く球や箱のために光を戻す
+  }
+
+  // 地面に落とす楕円の影。地面すれすれ(y=0.02)に寝かせて置く。
+  void drawGroundShadow(float x, float z, float size) {
+    noLights();
+    noStroke();
+    fill(0, 70);
+    pushMatrix();
+    translate(x, 0.02, z);
+    rotateX(HALF_PI);      // 縦の円を寝かせて地面に貼る
+    ellipse(0, 0, size, size * 0.5);
+    popMatrix();
+    applySceneLights();
+  }
+
+  // ---- 主人公 ----
+  // 画像があれば板に貼って描き、無ければ球と箱で描く。
+  void drawPlayer(Game g) {
     // 走りの上下ゆれ。周期を走行速度に比例させないと、速いときに足が滑って見える。
     float bobRate = 6 + 8 * (speedAtZ(g.z) / BASE_SPEED);
     float bob = abs(sin(g.elapsed * bobRate)) * 0.18;
+    float pop = max(0, g.foodPop / FOOD_POP_SEC);   // 食べた瞬間に一瞬ふくらむ
 
-    // 食べた瞬間に一瞬ふくらむ
-    float pop = max(0, g.foodPop / FOOD_POP_SEC);
+    if (USE_IMAGES && assets.player != null) {
+      // 影は必ず地面(y=0)に置く。主人公は跳ねるので、影が離れるほど跳んで見える。
+      // 影が無いと、地面に立っているのか浮いているのか分からない。
+      drawGroundShadow(g.x, g.z, 1.5 - bob * 0.8);
 
+      // 絵の縦横を少しだけ変えて、着地の重みと食べた瞬間の反応を出す
+      float squash = 1 - abs(sin(g.elapsed * bobRate)) * 0.04;
+      billboard(assets.player, g.x, bob, g.z,
+                PLAYER_IMG_HEIGHT * squash * (1 + pop * 0.15), 255);
+      return;
+    }
+
+    drawPlayerShapes(g, bob, pop);
+  }
+
+  // 画像が無いときの主人公。球(胴体)+ 球(頭)+ 箱(帽子)。
+  void drawPlayerShapes(Game g, float bob, float pop) {
+    noStroke();
+    pushMatrix();
     translate(g.x, bob, g.z);
     scale(1 + pop * 0.3, 1 + pop * 0.15, 1 + pop * 0.3);
 

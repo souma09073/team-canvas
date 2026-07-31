@@ -39,6 +39,20 @@ final int SCREEN_H = 720;
 // フルスクリーンならその心配がない。
 final boolean FULLSCREEN = true;
 
+// ---- 見た目 ----
+// イラストを使うか。false にすると、画像があっても全部が球と箱の表示に戻る。
+// 何かおかしくなったら、まずここを false にして切り分ける。
+final boolean USE_IMAGES = true;
+
+// 主人公の絵の高さ(ワールド単位)。球で描いていたときの体格に合わせてある。
+// 大きすぎ・小さすぎを感じたらここを変える。
+final float PLAYER_IMG_HEIGHT = 3.4;
+
+// 絵を貼った板をカメラ側へ倒す角度(度)。
+// カメラは少し見下ろしているので、0のままだと「地面に立てたシール」に見えることがある。
+// その場合は 10〜20 くらいを試す。0 で真っ直ぐ立つ。
+final float BILLBOARD_TILT = 0;
+
 // ---- 血糖 ----
 // 必要ペース = FOOD_GAIN / DRAIN_PER_SEC 秒に1個(今は 20/10 = 2.0秒に1個)
 final float DRAIN_PER_SEC      = 10;    // 血糖の毎秒自然減少・通常時

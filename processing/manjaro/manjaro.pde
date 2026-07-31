@@ -15,6 +15,7 @@
 Game game;
 View3D view;
 Hud hud;
+Assets assets;
 
 void settings() {
   if (FULLSCREEN) {
@@ -43,6 +44,9 @@ void setup() {
   game = new Game();
   view = new View3D();
   hud  = new Hud();
+
+  assets = new Assets();
+  assets.load();   // 画像が無ければ null のまま。描画側が仮の図形に切り替わる
 
   loadFonts();
   game.loadBest();
