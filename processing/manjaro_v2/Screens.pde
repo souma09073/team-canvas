@@ -9,15 +9,22 @@ class Screens {
 
   void draw(Game g) {
     if (g.state == STATE_RUNNING) return;
-
-    fill(0, 170);
-    rect(0, 0, SCREEN_W, SCREEN_H);
     textAlign(CENTER, CENTER);
 
-    // 「倒れた」画面は無い。血糖が振り切れても減速するだけで、走り続ける。
-    if      (g.state == STATE_READY) drawTitle();
-    else if (g.state == STATE_FERRY) drawFerry(g);
-    else if (g.state == STATE_GOAL)  drawGoal(g);
+    // カウントダウンだけは画面を覆わない。
+    // これから来る食べ物や岩が見えていないと、構える意味が無いため。
+    if (g.state == STATE_COUNTDOWN) { drawCountdown(g); return; }
+
+    // 「倒れた」画面は無い。血糖が振り切れても止まるだけで、そのまま続く。
+    if      (g.state == STATE_READY) { dim(); drawTitle(); }
+    else if (g.state == STATE_FERRY) { drawFerry(g); }        // 海の背景で覆うので dim は不要
+    else if (g.state == STATE_GOAL)  { dim(); drawGoal(g); }
+  }
+
+  // 3Dの世界を暗く沈めて、文字を読みやすくする
+  void dim() {
+    fill(0, 170);
+    rect(0, 0, SCREEN_W, SCREEN_H);
   }
 
   void drawTitle() {
@@ -45,45 +52,104 @@ class Screens {
     text("ESC キーで終了", SCREEN_W * 0.5, 520);
   }
 
-  // ---- フェリー ----
-  // エリアの区切りで手を止める休憩画面。
+  // ============================================================
+  // フェリー
+  //
   // 企画書の「ステージ間はフェリー移動」をそのまま使っている。
-  // ここで一度緊張を切らないと、走りっぱなしで疲れる(先生の指摘)。
+  // 3回あるうち、真ん中の1回だけ止まって途中経過を見せる。
+  // 全部止めるとテンポが悪く、全部流すと休む間が無いため。
+  // ============================================================
   void drawFerry(Game g) {
     Region done = regions[g.ferryFromRegion];
     Region next = regions[g.regionIndex];
 
-    setText(fontBig, 30);
-    fill(C_ACCENT);
-    text("⛴  " + done.name + " を走り終えた", SCREEN_W * 0.5, 150);
+    drawSea();
+    drawFerryRoute(g, done, next);
 
-    // そのエリアの成績
+    if (g.ferryIsRest()) drawFerryRest(g);      // 中間地点。止まって成績を見せる
+    else                 drawFerryAuto(g);      // 自動で流れる回
+  }
+
+  // 海。フェリーで渡っていることを背景で示す。
+  void drawSea() {
+    fill(18, 52, 84);
+    rect(0, 0, SCREEN_W, SCREEN_H);
+
+    // 波。ゆっくり流れて、移動している感じを出す
+    fill(255, 22);
+    for (int i = 0; i < 7; i++) {
+      float y = 300 + i * 55;
+      float offset = (millis() * 0.03 + i * 90) % (SCREEN_W + 300) - 150;
+      rect(offset, y, 180, 5, 3);
+      rect(offset - 420, y, 120, 5, 3);
+    }
+  }
+
+  // 「どこから、どこへ」を線と船で示す
+  void drawFerryRoute(Game g, Region done, Region next) {
+    float y = 210;
+    float x1 = SCREEN_W * 0.5 - 300, x2 = SCREEN_W * 0.5 + 300;
+
+    setText(fontMid, 22);
+    textAlign(CENTER, CENTER);
+    fill(255, 200);
+    text(done.name, x1, y - 55);
+    fill(255);
+    text(next.name, x2, y - 55);
+
+    // 航路
+    stroke(255, 70);
+    strokeWeight(2);
+    line(x1, y, x2, y);
+    noStroke();
+
+    // 船。フェリーの残り時間に合わせて左から右へ進む。
+    // 中間地点(止まる回)では真ん中に留めておく。
+    float t = g.ferryIsRest() ? 0.5 : 1 - constrain(g.ferryTimer / FERRY_SEC, 0, 1);
+    float bx = lerp(x1, x2, t);
+
+    fill(C_ACCENT);
+    pushMatrix();
+    translate(bx, y - 14);
+    triangle(-22, 10, 22, 10, 0, -14);   // 船体
+    rect(-3, -30, 6, 18);                // マスト
+    popMatrix();
+  }
+
+  // 自動で流れる回。文字だけ出して、あとは待たせる。
+  void drawFerryAuto(Game g) {
+    setText(fontBig, 30);
+    textAlign(CENTER, CENTER);
+    fill(255);
+    text("⛴  フェリーで移動中", SCREEN_W * 0.5, 400);
+
+    // 残り時間のバー。あとどれくらいで走り出すか分かるように
+    float w = 320, h = 6;
+    float x = SCREEN_W * 0.5 - w * 0.5, y = 460;
+    fill(255, 50);
+    rect(x, y, w, h, 3);
+    fill(C_ACCENT);
+    rect(x, y, w * (1 - constrain(g.ferryTimer / FERRY_SEC, 0, 1)), h, 3);
+  }
+
+  // 中間地点。ここだけ止まって、そこまでの経過を見せる。
+  void drawFerryRest(Game g) {
+    setText(fontBig, 26);
+    textAlign(CENTER, CENTER);
+    fill(C_ACCENT);
+    text("中間地点", SCREEN_W * 0.5, 330);
+
     setText(fontBig, 40);
     fill(255);
-    text(nf(g.stageTime(), 1, 2) + " 秒", SCREEN_W * 0.5, 225);
+    text(nf(g.stageTime(), 1, 2) + " 秒", SCREEN_W * 0.5, 390);
 
     setText(fontSmall, 16);
     fill(255, 220);
     text("食べた " + g.stageFoodCount + " 回"
        + "　　マンジャロ " + (g.shotUsedInRegion[g.ferryFromRegion] ? "使用した" : "使わなかった"),
-       SCREEN_W * 0.5, 285);
+       SCREEN_W * 0.5, 440);
 
-    // 到着時の血糖。医師との約束を守れているかが分かる
     drawArrivalGlucose(g);
-
-    // 次の土地
-    stroke(255, 60);
-    strokeWeight(1);
-    line(SCREEN_W * 0.5 - 220, 430, SCREEN_W * 0.5 + 220, 430);
-    noStroke();
-
-    setText(fontMid, 22);
-    fill(255, 230);
-    text("次は  " + next.name, SCREEN_W * 0.5, 480);
-
-    setText(fontSmall, 14);
-    fill(255, 180);
-    text("マンジャロは新しい週の分が使える", SCREEN_W * 0.5, 520);
 
     setText(fontBig, 22);
     fill(C_ACCENT);
@@ -95,11 +161,38 @@ class Screens {
   void drawArrivalGlucose(Game g) {
     boolean stable = (g.glucose >= STABLE_MIN && g.glucose <= STABLE_MAX);
 
-    setText(fontMid, 20);
+    setText(fontMid, 19);
     fill(stable ? C_GLU_STABLE : C_GLU_HIGH);
     text(stable ? "到着時の血糖 " + int(g.glucose) + " … 安定域を保てた"
                 : "到着時の血糖 " + int(g.glucose) + " … 安定域を外れている",
-         SCREEN_W * 0.5, 350);
+         SCREEN_W * 0.5, 495);
+  }
+
+  // ============================================================
+  // カウントダウン
+  //
+  // 3Dの世界は見えたまま止まっているので、これから来る食べ物や岩を見て構えられる。
+  // 全画面を覆わず、数字だけを重ねているのはそのため。
+  // ============================================================
+  void drawCountdown(Game g) {
+    int n = ceil(g.countdownTimer);
+    if (n <= 0) return;
+
+    // 数字が切り替わるたびに大きく出て縮む。残り時間から進み具合を出す。
+    float within = 1 - (g.countdownTimer - floor(g.countdownTimer));   // 0→1
+    float scale = 1.6 - 0.6 * within;
+    float fade = 255 * (1 - within * 0.35);
+
+    textAlign(CENTER, CENTER);
+    setText(fontBig, 90 * scale);
+    fill(0, 120);
+    text(n + "", SCREEN_W * 0.5 + 4, SCREEN_H * 0.42 + 4);   // 影。背景に紛れないように
+    fill(C_ACCENT, fade);
+    text(n + "", SCREEN_W * 0.5, SCREEN_H * 0.42);
+
+    setText(fontMid, 20);
+    fill(255, 220);
+    text(regions[g.regionIndex].name, SCREEN_W * 0.5, SCREEN_H * 0.56);
   }
 
   void drawGoal(Game g) {
@@ -132,6 +225,7 @@ class Screens {
     fill(255, 230);
     text("マンジャロ " + g.shotCount + " / " + weeks + " 回"
        + "　　倒れた " + g.collapseCount + " 回"
+       + "　　岩 " + g.rockHitCount + " 回"
        + "　　ゾーン " + nf(g.zoneTotal, 1, 1) + " 秒", SCREEN_W * 0.5, 285);
   }
 

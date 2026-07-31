@@ -76,3 +76,8 @@ final color C_NUM_NORMAL = #FFFFFF;   // 通常
 
 final color C_RING_HIGH  = #FF3C3C;   // ミニバーの枠(高血糖)
 final color C_BLOCKED    = #78DCFF;   // 「血糖上昇なし」の文字
+
+// ---- 岩(障害物) ----
+// 食べ物と間違えないよう、暗く彩度の低い色にしてある。
+final color C_ROCK     = #6E6A66;   // 岩
+final color C_ROCK_HIT = #4A4744;   // ぶつかった後(もう当たらないことを示す)

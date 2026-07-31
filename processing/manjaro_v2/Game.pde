@@ -11,11 +11,16 @@
 // ============================================================
 
 // ゲームの状態。
-// 「倒れた」状態は無い。血糖が振り切れても走り続け、減速するだけ(collapse)。
-final int STATE_READY   = 0;   // タイトル画面
-final int STATE_RUNNING = 1;   // 走行中
-final int STATE_FERRY   = 2;   // 港。次のエリアへ渡る前の休憩
-final int STATE_GOAL    = 3;   // ゴールした
+//
+// 走る前には必ずカウントダウンが入る。エリアの境目ではフェリーで移動する。
+//   タイトル → カウントダウン → 走行 → フェリー → カウントダウン → 走行 → … → ゴール
+//
+// 「倒れた」という状態は無い。血糖が振り切れても一定時間止まるだけで、そのまま続く。
+final int STATE_READY     = 0;   // タイトル画面
+final int STATE_COUNTDOWN = 1;   // 3・2・1。世界は見えているが動かない
+final int STATE_RUNNING   = 2;   // 走行中
+final int STATE_FERRY     = 3;   // フェリーで移動中
+final int STATE_GOAL      = 4;   // ゴールした
 
 class Game {
   Course course = new Course();
@@ -32,10 +37,19 @@ class Game {
   float glucose = 50;
   float hyperTimer = 0;         // 高血糖カウントダウンの残り。0なら発動していない
 
-  // ---- 倒れた(減速中) ----
-  float collapse = 0;           // 減速している残り時間。0なら通常走行
-  String collapseReason = "";   // 「高血糖」か「低血糖」か
-  int collapseCount = 0;        // 倒れた回数(成績に出す)
+  // ---- 停止中 ----
+  // 血糖で倒れた場合と、岩にぶつかった場合の両方をここで扱う。
+  // 止まっている間は前進も血糖も当たり判定も全部止まり、経過タイムだけが進む。
+  // 止まった秒数が、そのまま失う時間になる。
+  float stopTimer = 0;          // 止まっている残り時間。0なら通常走行
+  String stopReason = "";       // 画面に出す理由
+  boolean stopIsCollapse = false;  // 血糖で倒れたのか(表示を変えるため)
+  int collapseCount = 0;        // 血糖で倒れた回数
+  int rockHitCount = 0;         // 岩にぶつかった回数
+
+  // ---- フェリーとカウントダウン ----
+  float ferryTimer = 0;         // 自動で流れるフェリーの残り時間
+  float countdownTimer = 0;     // 走り出すまでの残り時間
 
   // ---- マンジャロ ----
   // 1エリア(=1週間)につき1回だけ打てる。打ったエリアを覚えておく。
@@ -75,19 +89,33 @@ class Game {
   // ============================================================
 
   void reset() {
-    state = STATE_RUNNING;
     z = 0;  lane = 1;  x = laneToX(1);  elapsed = 0;
-    glucose = 50;  hyperTimer = 0;
-    collapse = 0;  collapseReason = "";  collapseCount = 0;
+    hyperTimer = 0;
+    stopTimer = 0;  stopReason = "";  stopIsCollapse = false;
+    collapseCount = 0;  rockHitCount = 0;
     shotUsedInRegion = new boolean[regions.length];   // エリアごとの使用権をリセット
     shotEffect = 0;  lock = 0;
     zoneGauge = 0;  zoneActive = 0;  zoneReady = false;
     shotFlash = 0;  foodPop = 0;
-    regionIndex = 0;
-    regionBanner = REGION_BANNER_SEC;   // 出発地(沖縄)の名前を最初に出す
-    ferryFromRegion = 0;  stageStartTime = 0;  stageFoodCount = 0;
+    regionIndex = 0;  ferryFromRegion = 0;
+    ferryTimer = 0;
     shotCount = 0;  robbedCount = 0;  zoneTotal = 0;  newRecord = false;
     course.build();
+
+    startCountdown();   // いきなり走り出さず、必ず構える時間を置く
+  }
+
+  // ---- 走り出す前のカウントダウン ----
+  // タイトルからも、フェリーからも、必ずここを通る。
+  // 血糖を整えるのもここ(港で食事をとった、という扱い)。
+  void startCountdown() {
+    state = STATE_COUNTDOWN;
+    countdownTimer = COUNTDOWN_SEC;
+    glucose = GLUCOSE_RESET;
+    hyperTimer = 0;
+    stopTimer = 0;
+    stageStartTime = elapsed;
+    stageFoodCount = 0;
   }
 
   void moveLeft()  { if (state == STATE_RUNNING) lane = max(0, lane - 1); }
@@ -131,7 +159,17 @@ class Game {
   // ============================================================
 
   void update(float dt) {
+    if (state == STATE_COUNTDOWN) { updateCountdown(dt); return; }
+    if (state == STATE_FERRY)     { updateFerry(dt);     return; }
     if (state != STATE_RUNNING) return;
+
+    // 止まっている間は、経過タイムだけが進む。
+    // 前進も血糖も当たり判定も全部飛ばすので、世界は完全に静止する。
+    if (isStopped()) {
+      elapsed += dt;
+      stopTimer = max(0, stopTimer - dt);
+      return;
+    }
 
     updateGlucoseDrain(dt);   // 血糖が自然に減る
     updateTimers(dt);         // 各種タイマーを進める
@@ -142,6 +180,7 @@ class Game {
     moveLane(dt);             // レーンの間を横に動く
 
     checkFoodPickup();        // 食べ物に当たったか
+    checkRockHit();           // 岩に当たったか
     checkWomanHit();          // 女性に当たったか
 
     checkHyperglycemia(dt);   // 高血糖のカウントダウン
@@ -149,18 +188,61 @@ class Game {
     checkGoal();              // ゴール判定
   }
 
-  // ---- 倒れる ----
-  // 以前は即ゲームオーバーだったが、減速に変えた。
+  // ---- カウントダウン ----
+  void updateCountdown(float dt) {
+    countdownTimer = max(0, countdownTimer - dt);
+    if (countdownTimer > 0) return;
+
+    state = STATE_RUNNING;
+    regionBanner = REGION_BANNER_SEC;   // 走り出すと同時に地名を出す
+  }
+
+  // ---- フェリー ----
+  // 中間地点(restAfter が true のエリアのあと)だけは Enter 待ちで止まる。
+  // それ以外は演出が流れて自動で次へ進む。テンポを優先するため。
+  void updateFerry(float dt) {
+    if (ferryIsRest()) return;   // 止まる回。プレイヤーの Enter を待つ
+
+    ferryTimer = max(0, ferryTimer - dt);
+    if (ferryTimer <= 0) leaveFerry();
+  }
+
+  boolean ferryIsRest() { return regions[ferryFromRegion].restAfter; }
+
+  // 港を出発して次のエリアへ。自動の場合も Enter の場合もここを通る。
+  void leaveFerry() {
+    if (state != STATE_FERRY) return;
+    startCountdown();
+  }
+
+  // ---- 停止の共通処理 ----
+  // すでに止まっているなら、長いほうを残す(岩の直後に倒れても短くならないように)。
+  void startStop(String reason, float sec, boolean isCollapse) {
+    if (sec < stopTimer) return;
+    stopTimer = sec;
+    stopReason = reason;
+    stopIsCollapse = isCollapse;
+  }
+
+  // ---- 血糖で倒れる ----
+  // 以前は即ゲームオーバーだったが、一定時間止まるだけに変えた。
   // 治療を受けて血糖が戻り、そのまま走り続ける。失うのは時間だけ。
   void doCollapse(String reason) {
-    collapse = COLLAPSE_SEC;
-    collapseReason = reason;
+    startStop(reason, COLLAPSE_STOP_SEC, true);
     collapseCount++;
-    glucose = COLLAPSE_GLUCOSE;   // 治療を受けた
+    glucose = GLUCOSE_RESET;   // 治療を受けた
     hyperTimer = 0;
   }
 
-  boolean isCollapsed() { return collapse > 0; }
+  // ---- 岩にぶつかる ----
+  // 血糖とは無関係。見て避けるだけの障害物なので、止まる時間は短い。
+  void doRockHit() {
+    startStop("岩にぶつかった", ROCK_STOP_SEC, false);
+    rockHitCount++;
+  }
+
+  boolean isStopped()   { return stopTimer > 0; }
+  boolean isCollapsed() { return stopTimer > 0 && stopIsCollapse; }
 
   // ---- 血糖の自然減少 ----
   // ゾーン中も普通に減る。ゾーンを安全地帯にすると、マンジャロを使う理由が消えるため。
@@ -176,7 +258,6 @@ class Game {
 
   void updateTimers(float dt) {
     elapsed      += dt;
-    collapse      = max(0, collapse - dt);
     shotEffect    = max(0, shotEffect - dt);
     shotFlash     = max(0, shotFlash - dt);
     lock          = max(0, lock - dt);
@@ -204,13 +285,10 @@ class Game {
   }
 
   // ---- 前進 ----
-  // 速度を変える要素は、ゾーン(速くなる)と 倒れた状態(遅くなる)の2つ。
-  // 食べた瞬間の加速はコントロールを失うので廃止した。
+  // 速度を変える要素はゾーンだけ(食べた瞬間の加速はコントロールを失うので廃止)。
+  // 止まっているときは update の冒頭で抜けるので、ここには来ない。
   void moveForward(float dt) {
-    float mult = 1;
-    if (isCollapsed())      mult = COLLAPSE_SPEED_MULT;   // 倒れている間は大きく減速
-    else if (zoneActive > 0) mult = ZONE_SPEED_MULT;
-    z += runSpeed() * mult * dt;
+    z += runSpeed() * (zoneActive > 0 ? ZONE_SPEED_MULT : 1) * dt;
   }
 
   // ---- エリア ----
@@ -225,15 +303,7 @@ class Game {
     ferryFromRegion = regionIndex;   // 走り終えたエリア
     regionIndex = now;
     state = STATE_FERRY;
-  }
-
-  // 港を出発して次のエリアへ。フェリー画面から呼ばれる。
-  void leaveFerry() {
-    if (state != STATE_FERRY) return;
-    state = STATE_RUNNING;
-    regionBanner = REGION_BANNER_SEC;   // 新しい土地の名前を出す
-    stageStartTime = elapsed;
-    stageFoodCount = 0;
+    ferryTimer = FERRY_SEC;          // 自動で流れる回だけ使われる
   }
 
   // いま走っているエリアに入ってからの経過時間
@@ -275,6 +345,18 @@ class Game {
       glucose += FOOD_GAIN;
       foodPop = FOOD_POP_SEC;
       stageFoodCount++;
+    }
+  }
+
+  // ---- 岩 ----
+  // ゾーン中はすり抜ける(ゾーンの数少ない利点)。
+  // 一度ぶつかった岩は二度は当たらない。
+  void checkRockHit() {
+    if (zoneActive > 0) return;
+    for (Rock r : course.rocks) {
+      if (r.hit || !isTouching(r.z, r.lane)) continue;
+      r.hit = true;
+      doRockHit();
     }
   }
 

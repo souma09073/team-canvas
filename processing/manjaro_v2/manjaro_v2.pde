@@ -1,15 +1,21 @@
 // ============================================================
-// マンジャロ日本縦断ゲーム
-// HTMLプロトタイプ(prototype/prototype.html)の完全移植版。
+// マンジャロ日本縦断ゲーム(新版)
 //
-// 見た目はプリミティブ(球と箱)の仮。まずゲームとして成立させ、
-// そのあとイラストを差し替えていく方針。
+// 沖縄から北海道まで、4つのエリアを走り抜ける。
+// エリアの区切りはフェリーで移動し、走り出す前に必ずカウントダウンが入る。
 //
-//   Config.pde … 調整する数値。全部ここ
-//   Course.pde … コース生成(シード固定)
-//   Game.pde   … ゲームのルール。描画には触れない
-//   View3D.pde … 3D描画
-//   Hud.pde    … 画面表示
+//   タイトル → カウントダウン → 沖縄 → フェリー → カウントダウン → 本州西
+//   → 中間地点 → カウントダウン → 本州東 → フェリー → カウントダウン → 北海道 → ゴール
+//
+// 見た目はまだプリミティブ(球と箱)が中心。画像は置けば自動で差し替わる。
+//
+//   Config.pde  … 調整する数値。全部ここ
+//   Regions.pde … エリアの定義(速度・長さ・色)
+//   Course.pde  … コース生成(シード固定)
+//   Game.pde    … ゲームのルール。描画には触れない
+//   View3D.pde  … 3D描画
+//   Hud.pde     … 走行中の画面表示
+//   Screens.pde … タイトル / フェリー / カウントダウン / ゴール
 // ============================================================
 
 Game game;
@@ -55,16 +61,11 @@ void setup() {
   game.course.build();
   lastMillis = millis();   // 1フレーム目に起動時間ぶんの dt が入らないようにする
 
-  // HTMLプロトタイプと同じコースが生成できているかを、起動時に照合できるようにする。
-  // 期待値(prototype.html から算出):
-  //   コース長 7315 / 食べ物 153 個 / 女性 7 体 / 壁 z=5917-6112 / 終盤 z=5722
-  // ここがずれていたら、乱数か配置ロジックの移植を間違えている。
-  println("--- コース照合 ---");
-  println("コース長  " + int(COURSE_LENGTH) + " units   (期待 7315)");
-  println("食べ物    " + game.course.foods.size() + " 個   (期待 153)");
-  println("女性      " + game.course.women.size() + " 体   (期待 7)");
-  println("壁        z=" + int(game.course.wallStart) + "-" + int(game.course.wallEnd) + "   (期待 5917-6112)");
-  println("終盤入口  z=" + int(game.course.challengeStart) + "   (期待 5722)");
+  // 生成されたコースの中身。数値を振ったあと、意図どおりになっているか確認する用。
+  println("--- コース ---");
+  println("食べ物 " + game.course.foods.size() + " 個"
+        + " / 岩 " + game.course.rocks.size() + " 個"
+        + " / 女性 " + game.course.women.size() + " 体");
 }
 
 int lastMillis = 0;
@@ -101,8 +102,16 @@ void keyPressed() {
     if (key == ENTER || key == RETURN) game.reset();
     return;
   }
+  // フェリーは、中間地点の回だけ Enter を待つ。
+  // 自動で流れる回は入力を受けない(押しても飛ばせない)。
   if (game.state == STATE_FERRY) {
-    if (key == ENTER || key == RETURN) game.leaveFerry();
+    if ((key == ENTER || key == RETURN) && game.ferryIsRest()) game.leaveFerry();
+    if (key == 'r' || key == 'R') game.reset();
+    return;
+  }
+
+  // カウントダウン中はレーンだけ動かせる。構える時間なので。
+  if (game.state == STATE_COUNTDOWN) {
     if (key == 'r' || key == 'R') game.reset();
     return;
   }
@@ -121,5 +130,5 @@ void keyPressed() {
 
 void mousePressed() {
   if (game.state == STATE_READY) game.reset();
-  else if (game.state == STATE_FERRY) game.leaveFerry();
+  else if (game.state == STATE_FERRY && game.ferryIsRest()) game.leaveFerry();
 }

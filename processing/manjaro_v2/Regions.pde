@@ -28,12 +28,17 @@ class Region {
   String foodImage;   // その土地の食べ物の画像名。無ければ仮の球で描く
   String skyImage;    // その土地の背景の画像名。無ければ空色で塗る
 
+  // このエリアを走り終えたあとのフェリーで、いったん止まるか。
+  // true  … 途中経過を見せて Enter 待ち(中間地点)
+  // false … 3秒の移動演出が流れて自動で次へ(テンポ優先)
+  boolean restAfter;
+
   // 以下は buildRegions() が計算して入れる
   float startZ;
   float endZ;
 
   Region(String name, float baseSpeed, float rampMult, float targetSec,
-         color land, color sea, String foodImage, String skyImage) {
+         color land, color sea, String foodImage, String skyImage, boolean restAfter) {
     this.name = name;
     this.baseSpeed = baseSpeed;
     this.rampMult = rampMult;
@@ -42,6 +47,7 @@ class Region {
     this.sea = sea;
     this.foodImage = foodImage;
     this.skyImage = skyImage;
+    this.restAfter = restAfter;
   }
 
   float endSpeed() { return baseSpeed * rampMult; }
@@ -69,11 +75,11 @@ float COURSE_LENGTH = 0;   // 全エリアの合計。buildRegions() が計算�
 // setup() から呼ぶ。COURSE_LENGTH を使う処理より先に呼ぶこと。
 void buildRegions() {
   regions = new Region[] {
-    //         地名          開始 加速 目標秒  陸の色           海の色          食べ物の画像         背景の画像
-    new Region("沖縄",        95, 1.5,  25,  C_OKINAWA_LAND,  C_OKINAWA_SEA,  "food_okinawa.png",  "sky_okinawa.png"),
-    new Region("本州 西日本", 115, 1.5,  25,  C_WEST_LAND,     C_WEST_SEA,     "food_west.png",     "sky_west.png"),
-    new Region("本州 東日本", 135, 1.5,  25,  C_EAST_LAND,     C_EAST_SEA,     "food_east.png",     "sky_east.png"),
-    new Region("北海道",      160, 1.5,  25,  C_HOKKAIDO_LAND, C_HOKKAIDO_SEA, "food_hokkaido.png", "sky_hokkaido.png")
+    //         地名          開始 加速 目標秒  陸の色           海の色          食べ物の画像         背景の画像        休憩
+    new Region("沖縄",        95, 1.5,  25,  C_OKINAWA_LAND,  C_OKINAWA_SEA,  "food_okinawa.png",  "sky_okinawa.png",  false),
+    new Region("本州 西日本", 115, 1.5,  25,  C_WEST_LAND,     C_WEST_SEA,     "food_west.png",     "sky_west.png",     true),   // 中間地点
+    new Region("本州 東日本", 135, 1.5,  25,  C_EAST_LAND,     C_EAST_SEA,     "food_east.png",     "sky_east.png",     false),
+    new Region("北海道",      160, 1.5,  25,  C_HOKKAIDO_LAND, C_HOKKAIDO_SEA, "food_hokkaido.png", "sky_hokkaido.png", false)
   };
 
   // 全体の速さをまとめて掛ける。Config.pde の SPEED_SCALE で調整する。

@@ -38,7 +38,7 @@ class Hud {
     drawRegionBanner(g);
     drawFinalHint(g);
     drawWarnings(g);
-    drawCollapse(g);
+    drawStopped(g);
     screens.draw(g);
 
     end();
@@ -266,24 +266,36 @@ class Hud {
     text(msg, SCREEN_W * 0.5, 129);
   }
 
-  // ---- 倒れている間の表示 ----
-  // 何が起きたのか分からないまま遅くなるのが一番よくないので、
-  // 「倒れた」「治療を受けている」「だから遅い」を言葉で出す。
-  void drawCollapse(Game g) {
-    if (g.state != STATE_RUNNING || !g.isCollapsed()) return;
+  // ---- 止まっている間の表示 ----
+  // 何が起きたのか分からないまま止まるのが一番よくないので、
+  // 理由を言葉で出す。
+  //
+  // 血糖で倒れたときと岩にぶつかったときで、見せ方の重さを変えている。
+  // 岩は「見て避けそこねた」だけなので、画面を沈めるほどではない。
+  void drawStopped(Game g) {
+    if (g.state != STATE_RUNNING || !g.isStopped()) return;
 
-    // 画面全体を沈める。倒れている実感と、警告の点滅を隠す役目も兼ねる。
-    fill(0, 120);
-    rect(0, 0, SCREEN_W, SCREEN_H);
-
-    setText(fontBig, 40);
     textAlign(CENTER, CENTER);
-    fill(255, 90, 90);
-    text(g.collapseReason + "で倒れた", SCREEN_W * 0.5, SCREEN_H * 0.42);
 
-    setText(fontSmall, 17);
-    fill(255, 220);
-    text("治療を受けています…  " + nf(g.collapse, 1, 1) + " 秒", SCREEN_W * 0.5, SCREEN_H * 0.52);
+    if (g.isCollapsed()) {
+      // 画面全体を沈める。倒れている実感と、警告の点滅を隠す役目も兼ねる。
+      fill(0, 120);
+      rect(0, 0, SCREEN_W, SCREEN_H);
+
+      setText(fontBig, 40);
+      fill(255, 90, 90);
+      text(g.stopReason + "で倒れた", SCREEN_W * 0.5, SCREEN_H * 0.42);
+
+      setText(fontSmall, 17);
+      fill(255, 220);
+      text("治療を受けています…  " + nf(g.stopTimer, 1, 1) + " 秒", SCREEN_W * 0.5, SCREEN_H * 0.52);
+
+    } else {
+      // 岩など。走行の邪魔をしないよう、文字だけ短く出す。
+      setText(fontBig, 30);
+      fill(255, 200, 120);
+      text(g.stopReason, SCREEN_W * 0.5, SCREEN_H * 0.42);
+    }
   }
 
   // ---- 血糖の危険警告 ----

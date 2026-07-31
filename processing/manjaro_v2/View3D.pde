@@ -78,6 +78,7 @@ class View3D {
     drawLaneLines(g);
     drawSigns(g);
     drawFoods(g);
+    drawRocks(g);
     drawWomen(g);
     drawGoal(g);
     drawPlayer(g);
@@ -163,6 +164,25 @@ class View3D {
       translate(laneToX(f.lane), 1.0, f.z);
       fill(blocked ? C_FOOD_BLOCKED : C_FOOD, blocked ? a * 0.55 : a);
       sphere(0.8);
+      popMatrix();
+    }
+  }
+
+  // ---- 岩 ----
+  // 食べ物と間違えないよう、形も色もはっきり変えてある。
+  // 食べ物は丸くて明るいオレンジ、岩は角ばっていて暗い灰色。
+  void drawRocks(Game g) {
+    noStroke();
+    for (Rock r : g.course.rocks) {
+      if (!isVisible(r.z, g.z)) continue;
+      float a = fadeAlpha(r.z - g.z);
+      if (a <= 0) continue;
+
+      pushMatrix();
+      translate(laneToX(r.lane), 0.9, r.z);
+      rotateY(r.z * 0.7);   // 岩ごとに向きを変えて、同じ形の繰り返しに見えないようにする
+      fill(r.hit ? C_ROCK_HIT : C_ROCK, a);
+      box(2.0, 1.8, 1.8);
       popMatrix();
     }
   }
