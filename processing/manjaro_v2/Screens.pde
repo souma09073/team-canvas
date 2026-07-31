@@ -16,7 +16,8 @@ class Screens {
     if (g.state == STATE_COUNTDOWN) { drawCountdown(g); return; }
 
     // 「倒れた」画面は無い。血糖が振り切れても止まるだけで、そのまま続く。
-    if      (g.state == STATE_READY) { dim(); drawTitle(); }
+    if      (g.state == STATE_TITLE) { drawTitle(); }
+    else if (g.state == STATE_READY) { dim(); drawReady(); }
     else if (g.state == STATE_FERRY) { drawFerry(g); }        // 海の背景で覆うので dim は不要
     else if (g.state == STATE_GOAL)  { dim(); drawGoal(g); }
   }
@@ -27,7 +28,13 @@ class Screens {
     rect(0, 0, SCREEN_W, SCREEN_H);
   }
 
-  void drawTitle() {
+  void drawTitle(){
+
+    image(assets.title,0,0,SCREEN_W,SCREEN_H);
+
+  }
+
+  void drawReady() {
     setText(fontBig, 34);
     fill(255);
     text("マンジャロ日本縦断", SCREEN_W * 0.5, 200);

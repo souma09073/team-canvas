@@ -26,7 +26,7 @@ final int STATE_GOAL      = 5;   // ゴールした
 class Game {
   Course course = new Course();
 
-  int state = STATE_READY;
+  int state = STATE_TITLE;
 
   // ---- 走行 ----
   float z = 0;          // スタートからの距離
