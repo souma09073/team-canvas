@@ -263,10 +263,10 @@ class Game {
     hyperTimer = 0;
   }
 
-  // ---- 岩にぶつかる ----
+  // ---- フェンスにぶつかる ----
   // 血糖とは無関係。見て避けるだけの障害物なので、止まる時間は短い。
   void doRockHit() {
-    startStop("岩にぶつかった", ROCK_STOP_SEC, false);
+    startStop("フェンスにぶつかった", ROCK_STOP_SEC, false);
     rockHitCount++;
   }
 
@@ -382,7 +382,7 @@ class Game {
     for (Food f : course.foods) {
       if (f.eaten || !isTouching(f.z, f.lane)) continue;
       f.eaten = true;
-      glucose += foodGain();
+      glucose += f.gain;
       foodPop = FOOD_POP_SEC;
       stageFoodCount++;
     }

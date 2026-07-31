@@ -19,6 +19,16 @@ class Assets {
   PImage sky;
   PImage title;
   PImage energy;
+  PImage fens;
+  PImage foodSatar;
+  PImage foodTako;
+  PImage foodOkonomi;
+  PImage foodTendon;
+  PImage foodMonja;
+  PImage foodKiri;
+  PImage foodIce;
+  PImage foodIkura;
+  PImage foodZin;
 
   void load() {
     player = tryLoad("images/player.png");
@@ -28,6 +38,32 @@ class Assets {
     title  = tryLoad("images/title.png");
     energy = tryLoad("images/energy.png");
     if (energy == null) energy = tryLoad(dataPath("images/energy.png"));
+
+    fens = tryLoad("images/fens.png");
+
+    foodSatar = tryLoad("images/foodSatar.png");
+    foodTako = tryLoad("images/foodTako.png");
+    foodOkonomi = tryLoad("images/foodOkonomi.png");
+    foodTendon = tryLoad("images/foodTendon.png");
+    foodMonja = tryLoad("images/foodMonja.png");
+    foodKiri = tryLoad("images/foodKiri.png");
+    foodIce = tryLoad("images/foodIce.png");
+    foodIkura = tryLoad("images/foodIkura.png");
+    foodZin = tryLoad("images/foodZin.png");
+  }
+
+  PImage foodImageFor(String imageName) {
+    if (imageName == null) return food;
+    if (imageName.equals("foodSatar")) return foodSatar;
+    if (imageName.equals("foodTako")) return foodTako;
+    if (imageName.equals("foodOkonomi")) return foodOkonomi;
+    if (imageName.equals("foodTendon")) return foodTendon;
+    if (imageName.equals("foodMonja")) return foodMonja;
+    if (imageName.equals("foodKiri")) return foodKiri;
+    if (imageName.equals("foodIce")) return foodIce;
+    if (imageName.equals("foodIkura")) return foodIkura;
+    if (imageName.equals("foodZin")) return foodZin;
+    return food;
   }
 
   // 読めなければ null を返す。エラーで止めない。

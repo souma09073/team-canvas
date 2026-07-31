@@ -47,7 +47,11 @@ class Food {
   float z;              // スタートからの距離
   int lane;             // 0=左 1=中 2=右
   boolean eaten = false;
-  Food(float z, int lane) { this.z = z; this.lane = lane; }
+  String imageName;
+  float gain;
+  Food(float z, int lane, String imageName, float gain) {
+    this.z = z; this.lane = lane; this.imageName = imageName; this.gain = gain;
+  }
 }
 
 class Woman {
@@ -230,7 +234,7 @@ class Course {
     while (z < r.endZ - COURSE_END_CLEAR) {
       if (!isInsideDenseZone(z, d)) {
         int lane = pickLaneAvoiding(lastLane);
-        foods.add(new Food(z, lane));
+        foods.add(createFood(r, z, lane));
         lastLane = lane;
       }
       float gapSec = r.foodGapSecMin + rng.next() * (r.foodGapSecMax - r.foodGapSecMin);
@@ -241,6 +245,53 @@ class Course {
   boolean isInsideDenseZone(float z, DenseZone d) {
     if (d == null) return false;
     return z >= d.zFrom - DENSE_EDGE_BUFFER && z <= d.zTo + DENSE_EDGE_BUFFER;
+  }
+
+  int regionIndexOfCurrentRegion() {
+    for (int i = 0; i < regions.length; i++) {
+      if (regions[i] == lastRegionUsedForFood) return i;
+    }
+    return 0;
+  }
+
+  Region lastRegionUsedForFood;
+
+  Food createFood(Region r, float z, int lane) {
+    lastRegionUsedForFood = r;
+    int regionIndex = regionIndexOfCurrentRegion();
+    String[] options = foodOptionsForRegion(regionIndex);
+    int typeIndex = int(abs((z * 0.017 + lane * 7 + regionIndex * 13) % options.length));
+    String imageName = options[typeIndex];
+    float gain = foodGainForType(regionIndex, imageName, r.foodGain);
+    return new Food(z, lane, imageName, gain);
+  }
+
+  String[] foodOptionsForRegion(int regionIndex) {
+    switch (regionIndex) {
+      case 0: return new String[] { "foodSatar" };
+      case 1: return new String[] { "foodTako", "foodOkonomi" };
+      case 2: return new String[] { "foodTendon", "foodMonja", "foodKiri" };
+      case 3: return new String[] { "foodIce", "foodIkura", "foodZin" };
+      default: return new String[] { "foodMonja" };
+    }
+  }
+
+  float foodGainForType(int regionIndex, String imageName, float baseGain) {
+    if (regionIndex == 1) {
+      if (imageName.equals("foodOkonomi")) return baseGain + 5;
+      return baseGain;
+    }
+    if (regionIndex == 2) {
+      if (imageName.equals("foodTendon")) return baseGain + 5;
+      if (imageName.equals("foodKiri")) return max(1, baseGain - 5);
+      return baseGain;
+    }
+    if (regionIndex == 3) {
+      if (imageName.equals("foodIkura")) return baseGain + 5;
+      if (imageName.equals("foodZin")) return max(1, baseGain - 5);
+      return baseGain;
+    }
+    return baseGain;
   }
 
   // 直前と同じレーンを候補から外して1つ選ぶ。
@@ -325,7 +376,7 @@ class Course {
   // 1列ぶんの食べ物を置く。壁の列だけは3レーン全部を埋める。
   void placeRow(float rowZ, int openLane, boolean isWall) {
     for (int lane = 0; lane < 3; lane++) {
-      if (isWall || lane != openLane) foods.add(new Food(rowZ, lane));
+      if (isWall || lane != openLane) foods.add(createFood(regions[regionIndexOfCurrentRegion()], rowZ, lane));
     }
   }
 

@@ -183,11 +183,17 @@ class View3D {
       float a = fadeAlpha(f.z - g.z);
       if (a <= 0) continue;
 
-      pushMatrix();
-      translate(laneToX(f.lane), 1.0, f.z);
-      fill(blocked ? C_FOOD_BLOCKED : C_FOOD, blocked ? a * 0.55 : a);
-      sphere(0.8);
-      popMatrix();
+      PImage img = assets.foodImageFor(f.imageName);
+      if (img != null) {
+        float alpha = blocked ? a * 0.55 : a;
+        billboard(img, laneToX(f.lane), 1.1, f.z, 2.0, alpha);
+      } else {
+        pushMatrix();
+        translate(laneToX(f.lane), 1.0, f.z);
+        fill(blocked ? C_FOOD_BLOCKED : C_FOOD, blocked ? a * 0.55 : a);
+        sphere(1.6);
+        popMatrix();
+      }
     }
   }
 
@@ -200,15 +206,15 @@ class View3D {
       if (a <= 0) continue;
 
       if (assets.energy != null) {
-        billboard(assets.energy, laneToX(item.lane), 1.4, item.z, 1.2, a);
+        billboard(assets.energy, laneToX(item.lane), 1.4, item.z, 2.4, a);
       } else {
         pushMatrix();
         translate(laneToX(item.lane), 1.2, item.z);
         fill(C_SPEED_ITEM, a);
-        sphere(0.65);
+        sphere(1.3);
         fill(255, a * 0.85);
         translate(0, 0.1, 0);
-        sphere(0.28);
+        sphere(0.56);
         popMatrix();
       }
     }
@@ -224,12 +230,16 @@ class View3D {
       float a = fadeAlpha(r.z - g.z);
       if (a <= 0) continue;
 
-      pushMatrix();
-      translate(laneToX(r.lane), 0.9, r.z);
-      rotateY(r.z * 0.7);   // 岩ごとに向きを変えて、同じ形の繰り返しに見えないようにする
-      fill(r.hit ? C_ROCK_HIT : C_ROCK, a);
-      box(2.0, 1.8, 1.8);
-      popMatrix();
+      if (assets.fens != null) {
+        billboard(assets.fens, laneToX(r.lane), 0, r.z, 4.4, a);
+      } else {
+        pushMatrix();
+        translate(laneToX(r.lane), 0.9, r.z);
+        rotateY(r.z * 0.7);   // 岩ごとに向きを変えて、同じ形の繰り返しに見えないようにする
+        fill(r.hit ? C_ROCK_HIT : C_ROCK, a);
+        box(2.0, 1.8, 1.8);
+        popMatrix();
+      }
     }
   }
 
