@@ -31,7 +31,6 @@ class Hud {
     drawWarnings(g);
 
     drawProgress(g);
-    drawGlucose(g);
     drawMiniGauge(g);
     // コメントアウト: ゾーンバーを非表示化
     // drawZone(g);
