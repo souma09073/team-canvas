@@ -44,8 +44,53 @@ class Assets {
     manjaroPen = tryLoad("images/generated/mounjaro_pen.png");
   }
 
+  // ---- 道の脇の景色(Roadside.pde が使う)----
+  // エリア名 + 種類 で引く。例: roadside("okinawa", "tree")
+  // 読めなければ null。景色が出ないだけで、ゲームは動く。
+  HashMap<String, PImage> roadsideImages = new HashMap<String, PImage>();
+
+  // ---- エリアごとの背景(Sky.pde が使う)----
+  // 添字はエリアの番号。読めなければ null で、空は単色のままになる。
+  PImage[] skies;
+
+  void loadSkies() {
+    skies = new PImage[regions.length];
+    for (int i = 0; i < regions.length; i++) {
+      if (regions[i].skyImage == null) continue;
+      skies[i] = tryLoad("images/generated/" + regions[i].skyImage);
+    }
+  }
+
+  void loadRoadside() {
+    if (!USE_ROADSIDE) return;   // 使わない設定なら読み込まない
+    // Regions.pde で .area(...) を書いたエリアだけ読む。
+    // 全エリアぶん先に読むと、使わない画像でメモリを食うため。
+    for (Region r : regions) {
+      if (r.areaKey == null) continue;
+      loadRoadsideSet(r.areaKey);
+    }
+  }
+
+  void loadRoadsideSet(String area) {
+    String[] kinds = { "bld_a", "bld_b", "tree", "post" };
+    // ファイル名は bld_okinawa_a.png / tree_okinawa.png のように種類と位置が違う
+    String[] files = { "bld_" + area + "_a", "bld_" + area + "_b",
+                       "tree_" + area,       "post_" + area };
+
+    for (int i = 0; i < kinds.length; i++) {
+      roadsideImages.put(area + "/" + kinds[i],
+                         tryLoad("images/generated/" + files[i] + ".png"));
+    }
+  }
+
+  PImage roadside(String area, String kind) {
+    return roadsideImages.get(area + "/" + kind);
+  }
+
   void load() {
     loadUI();
+    loadSkies();
+    loadRoadside();
     player = tryLoad("images/player.png");
     food   = tryLoad("images/food.png");
     woman  = tryLoad("images/woman.png");

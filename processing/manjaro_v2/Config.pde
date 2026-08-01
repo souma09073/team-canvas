@@ -39,6 +39,35 @@ final int SCREEN_H = 720;
 // フルスクリーンならその心配がない。
 final boolean FULLSCREEN = true;
 
+// ---- 道の脇の景色(Roadside.pde)----
+// 建物・木・柱を世界の座標に固定して置く。走ると近づいて横を通り過ぎる。
+// 道の左が陸・右が海なので、建物と木は左だけ。右は柱だけ。
+//
+// 【道を隠さないように】道の半幅は 7(LANE_WIDTH*1.5+1)。
+// 建物を近づけすぎると画面の左半分が塞がって、食べ物が見えなくなる。
+// 【いまは切ってある】素材は揃っていて動くところまで確認済みだが、
+// 固定背景(Sky.pde)を優先する判断になったため止めている。
+// true に戻せば、Regions.pde で .area("okinawa") などを書いたエリアに景色が出る。
+final boolean USE_ROADSIDE = false;
+
+final float ROADSIDE_SPACING    = 34;   // 建物の間隔。狭いほど町が詰まって見える
+final float ROADSIDE_BLD_X      = 17;   // 建物の横位置(道の中心から)。小さいほど道に近い
+final float ROADSIDE_BLD_H_A    = 12;   // 大きい建物の高さ(主人公は 3.4)
+final float ROADSIDE_BLD_H_B    = 8;    // 小さい建物の高さ
+final float ROADSIDE_TREE_X     = 10.5; // 木の横位置。建物より道に近い側へ
+final float ROADSIDE_TREE_H     = 7;    // 木の高さ
+final float ROADSIDE_POST_X     = 10;   // 柱の横位置(右=海側)
+final float ROADSIDE_POST_H     = 9;    // 柱の高さ
+final float ROADSIDE_POST_SPACING = 46; // 柱の間隔
+final float ROADSIDE_EDGE_CLEAR = 60;   // スタートと港の周りを空ける距離
+
+// ---- エリアごとの背景(Sky.pde)----
+// プレイヤーから一定の距離に置いて追従させる固定背景。近づかないし横にも流れない。
+// 水平線が地面(y=0)に重なる位置に板を1枚立てているので、画角が変わっても合う。
+// 画像ごとの水平線の位置は Regions.pde の .skyAt(...) で指定する。
+final float SKY_DIST   = 430;   // 主人公から何 units 前方に置くか。地面の描画限界(420)のすぐ外
+final float SKY_HEIGHT = 700;   // 背景の高さ(ワールド単位)。大きいほど遠景が大きく写る
+
 // ---- 動作確認用 ----
 // タイトルの説明画面で 1〜4 を押すと、そのステージから始められる。
 // 北海道だけ直したいのに毎回沖縄から走るのは時間の無駄なので入れてある。

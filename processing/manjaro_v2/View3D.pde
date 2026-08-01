@@ -75,7 +75,9 @@ class View3D {
   // ============================================================
 
   void drawWorld(Game g) {
+    sky.draw(g);            // 背景がいちばん奥。他より先に描く
     drawGround(g);
+    roadside.draw(g);       // 道の脇の景色(いまは Config で切ってある)
     drawStartLine(g);
     drawLaneLines(g);
     drawSigns(g);

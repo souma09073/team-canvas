@@ -30,7 +30,9 @@ Game game;
 View3D view;
 Hud hud;
 Assets assets;
-Sprites sprites = new Sprites();   // 画像を枠にぴったり描く道具(Sprites.pde)
+Sprites sprites = new Sprites();     // 画像を枠にぴったり描く道具(Sprites.pde)
+Roadside roadside = new Roadside();  // 道の脇に流れる景色(Roadside.pde)
+Sky sky = new Sky();                 // エリアごとの固定背景(Sky.pde)
 
 String currentBgMusic = "";
 boolean footstepsPlaying = false;

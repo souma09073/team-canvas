@@ -83,6 +83,18 @@ class Region {
   }
   Region rest() { this.restAfter = true; return this; }
 
+  // 背景画像の、上端から水平線までの割合(Sky.pde が使う)。
+  // 画像ごとに構図が違う(沖縄は空が53%、北海道は86%)ので、エリアごとに指定する。
+  // ここがずれると、背景の水平線とゲームの地平線が食い違って背景が浮く。
+  float skyHorizon = 0.5;
+  Region skyAt(float horizonRatio) { this.skyHorizon = horizonRatio; return this; }
+
+  // 道の脇に置く景色のエリア名(Roadside.pde が使う)。
+  // "okinawa" と書くと bld_okinawa_a / bld_okinawa_b / tree_okinawa / post_okinawa を読む。
+  // 書かなければ景色は出ない。素材を確認できたエリアから1行ずつ足していく。
+  String areaKey;
+  Region area(String areaKey) { this.areaKey = areaKey; return this; }
+
   // ---- 計算 ----
   float endSpeed() { return baseSpeed * rampMult; }
   float length()   { return endZ - startZ; }
@@ -164,6 +176,7 @@ void buildRegions() {
       .speed(95, 1.5, 25)
       .limit(30)
       .look(C_OKINAWA_LAND, C_OKINAWA_SEA, "food_okinawa.png", "sky_okinawa.png")
+      .skyAt(0.531)               // 水平線の位置。空53% 海47%
       .food(0.36, 0.60, 16, 8),                 // 導入。密集なし。食べ物を増やす
 
     // 鹿児島に上陸してから名古屋まで。九州を含むので「本州」とは呼べない
@@ -172,6 +185,7 @@ void buildRegions() {
       .speed(115, 1.5, 25)
       .limit(30)
       .look(C_WEST_LAND, C_WEST_SEA, "food_west.png", "sky_west.png")
+      .skyAt(0.888)               // 水平線の位置。空89%
       .food(0.32, 0.52, 20, 10)                 // 少し多め。まだ密集なし
       .rest(),                                  // ← 中間地点。ここだけ止まる
 
@@ -180,6 +194,7 @@ void buildRegions() {
       .speed(135, 1.5, 25)
       .limit(30)
       .look(C_EAST_LAND, C_EAST_SEA, "food_east.png", "sky_east.png")
+      .skyAt(0.830)               // 水平線の位置。空83%
       .food(0.29, 0.45, 24, 12)                 // ここから避け続けないと保たない
       .dense(0.45, 0.62),                       // 密集地帯がひとつ
 
@@ -188,6 +203,7 @@ void buildRegions() {
       .speed(160, 1.5, 25)
       .limit(30)
       .look(C_HOKKAIDO_LAND, C_HOKKAIDO_SEA, "food_hokkaido.png", "sky_hokkaido.png")
+      .skyAt(0.862)               // 水平線の位置。空86%
       .food(0.25, 0.40, 28, 14)                 // 最難関。半分以上を避けないと高血糖になる
       .dense(0.45, 0.90)                        // ゴール直前まで密集。最後まで気を抜かせない
   };
