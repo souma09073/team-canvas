@@ -145,14 +145,14 @@ void buildRegions() {
       .speed(95, 1.5, 25)
       .limit(30)
       .look(C_OKINAWA_LAND, C_OKINAWA_SEA, "food_okinawa.png", "sky_okinawa.png")
-      .food(0.50, 0.80, 16, 8),                 // 導入。密集なし
+      .food(0.36, 0.60, 16, 8),                 // 導入。密集なし。食べ物を増やす
 
     region("本州 西日本")
       .ports("鹿児島港", "大阪港")
       .speed(115, 1.5, 25)
       .limit(30)
       .look(C_WEST_LAND, C_WEST_SEA, "food_west.png", "sky_west.png")
-      .food(0.42, 0.66, 20, 10)                 // 少し多め。まだ密集なし
+      .food(0.30, 0.48, 20, 10)                 // 少し多め。まだ密集なし。食べ物を増やす
       .rest(),                                  // ← 中間地点。ここだけ止まる
 
     region("本州 東日本")
