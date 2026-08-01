@@ -146,11 +146,19 @@ class Hud {
     rect(x0 - 2, y0 - 2, bw + 4, bh + 4, 8);
 
     // 下が0、上が100。左上のメーターと同じ配色にして読み替えを不要にする。
-    vBand(x0, y0, bw, bh, 0,                  DANGER_ZONE * 0.35f, C_GLU_CRITICAL);
-    vBand(x0, y0, bw, bh, DANGER_ZONE * 0.35f, DANGER_ZONE,        C_GLU_LOW);
-    vBand(x0, y0, bw, bh, DANGER_ZONE,         STABLE_MIN,         C_GLU_MID);
-    vBand(x0, y0, bw, bh, STABLE_MIN,          STABLE_MAX,         C_GLU_STABLE);
-    vBand(x0, y0, bw, bh, STABLE_MAX,          100,                C_GLU_HIGH);
+    //
+    // 【画像を使うときの注意】絵の帯の位置は描いた時点で固定される。
+    // STABLE_MIN などを変えても絵は変わらないので、大きく変えるなら
+    // 画像を差し替えるか、USE_IMAGES を false にして下の描画に戻すこと。
+    if (USE_IMAGES && assets.gaugeVert != null) {
+      sprites.draw(assets.gaugeVert, x0, y0, bw, bh);
+    } else {
+      vBand(x0, y0, bw, bh, 0,                  DANGER_ZONE * 0.35f, C_GLU_CRITICAL);
+      vBand(x0, y0, bw, bh, DANGER_ZONE * 0.35f, DANGER_ZONE,        C_GLU_LOW);
+      vBand(x0, y0, bw, bh, DANGER_ZONE,         STABLE_MIN,         C_GLU_MID);
+      vBand(x0, y0, bw, bh, STABLE_MIN,          STABLE_MAX,         C_GLU_STABLE);
+      vBand(x0, y0, bw, bh, STABLE_MAX,          100,                C_GLU_HIGH);
+    }
 
     drawMiniDangerRing(g, x0, y0, bw, bh);
 

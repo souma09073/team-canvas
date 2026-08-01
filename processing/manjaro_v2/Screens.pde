@@ -55,7 +55,12 @@ class Screens {
 
     setText(fontBig, 20);
     fill(C_ACCENT);
-    text("Enter または クリックでスタート", SCREEN_W * 0.5, 470);
+    // ボタンの画像があればそれを、無ければ文字で出す
+    if (USE_IMAGES && assets.btnStart != null) {
+      sprites.drawCenteredByHeight(assets.btnStart, SCREEN_W * 0.5, 442, 74);
+    } else {
+      text("Enter または クリックでスタート", SCREEN_W * 0.5, 470);
+    }
 
     setText(fontSmall, 13);
     fill(255, 150);
@@ -134,12 +139,17 @@ class Screens {
     float t = g.ferryIsRest() ? 0.5 : 1 - constrain(g.ferryTimer / FERRY_SEC, 0, 1);
     float bx = lerp(x1, x2, t);
 
-    fill(C_ACCENT);
-    pushMatrix();
-    translate(bx, y - 14);
-    triangle(-22, 10, 22, 10, 0, -14);   // 船体
-    rect(-3, -30, 6, 18);                // マスト
-    popMatrix();
+    // 船の絵があればそれを使う。船首が右を向いているので、進行方向と一致する。
+    if (USE_IMAGES && assets.ferrySide != null) {
+      sprites.drawCenteredByWidth(assets.ferrySide, bx, y - 16, 150);
+    } else {
+      fill(C_ACCENT);
+      pushMatrix();
+      translate(bx, y - 14);
+      triangle(-22, 10, 22, 10, 0, -14);   // 船体
+      rect(-3, -30, 6, 18);                // マスト
+      popMatrix();
+    }
   }
 
   // 自動で流れる回。文字だけ出して、あとは待たせる。

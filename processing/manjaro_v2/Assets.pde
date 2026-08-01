@@ -30,7 +30,22 @@ class Assets {
   PImage foodIkura;
   PImage foodZin;
 
+  // ---- UI の画像 ----
+  // 読めなければ null のまま。描画側が今までの図形・文字表示に戻る。
+  PImage btnStart;      // 「Enterキーでスタート」のボタン
+  PImage gaugeVert;     // 主人公の横に出る縦の血糖ゲージ
+  PImage ferrySide;     // フェリー画面の船(横から見た図)
+  PImage manjaroPen;    // マンジャロの注射ペン
+
+  void loadUI() {
+    btnStart   = tryLoad("images/generated/button_enter_start.png");
+    gaugeVert  = tryLoad("images/generated/glucose_gauge_vertical.png");
+    ferrySide  = tryLoad("images/generated/ferry_side.png");
+    manjaroPen = tryLoad("images/generated/mounjaro_pen.png");
+  }
+
   void load() {
+    loadUI();
     player = tryLoad("images/player.png");
     food   = tryLoad("images/food.png");
     woman  = tryLoad("images/woman.png");

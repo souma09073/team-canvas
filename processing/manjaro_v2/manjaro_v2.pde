@@ -30,6 +30,7 @@ Game game;
 View3D view;
 Hud hud;
 Assets assets;
+Sprites sprites = new Sprites();   // 画像を枠にぴったり描く道具(Sprites.pde)
 
 String currentBgMusic = "";
 boolean footstepsPlaying = false;

@@ -7,13 +7,31 @@
 //
 // そのため表示は「補充中」ではなく「今週分は投与済み」とし、
 // 待たされている理由が薬のルールだと伝わる言い方にしている。
+//
+// 【レイアウト】左に注射ペンの絵、右に文字。下に週の使用状況。
+//
+//   ┌──────────────────────────┐
+//   │  ╭──╮   マンジャロ        │
+//   │  │ペ│   投与できます      │
+//   │  │ン│   スペースで注射    │
+//   │  ╰──╯                    │
+//   │  ▬▬▬ ▬▬▬ ▬▬▬ ▬▬▬          │
+//   │     週1回しか打てない薬    │
+//   └──────────────────────────┘
+//
+// ペンは打てないときだけ暗くする。文字を読まなくても、絵の明るさだけで
+// 「いま打てるか」が視界の端で分かるようにするため。
 // ============================================================
 
 class ShotPanel {
 
   // パネルの位置と大きさ(設計座標)
-  final float PANEL_W = 250;
-  final float PANEL_H = 128;
+  final float PANEL_W = 300;
+  final float PANEL_H = 132;
+
+  // 中の配置。ここを変えれば全体が動く
+  final float PEN_BOX_W  = 76;    // 左のペン置き場の幅
+  final float TEXT_LEFT  = 92;    // 文字の左端(パネル左からの距離)
 
   void draw(Game g) {
     float px = SCREEN_W - PANEL_W - 24;
@@ -22,8 +40,10 @@ class ShotPanel {
     int frameColor = stateColor(g);
 
     drawFrame(px, py, frameColor);
+    drawPen(g, px, py);
     drawLabels(g, px, py, frameColor);
     drawWeekMarks(g, px, py, frameColor);
+    drawFooter(px, py);
     drawSpeedItemIcon(g);
   }
 
@@ -43,42 +63,89 @@ class ShotPanel {
     return "今週分は投与済み";
   }
 
-  // 2行目:その補足
+  // 2行目:その補足。
+  // 枠の中に収まる長さにしてある。長くすると右へはみ出す。
   String subtitle(Game g) {
     if (g.lock > 0)       return "取り返すまで " + nf(g.lock, 1, 1) + " 秒";
-    if (g.shotEffect > 0) return "食べても血糖は上がらない  " + nf(g.shotEffect, 1, 1) + " 秒";
+    if (g.shotEffect > 0) return "血糖が上がらない " + nf(g.shotEffect, 1, 1) + " 秒";
     if (g.canShoot())     return "スペースで注射";
-    return "次のエリアまで打てません";
+    return "次のエリアまで待つ";
   }
 
+  // ============================================================
+  // 各部品
+  // ============================================================
+
   void drawFrame(float px, float py, int frameColor) {
-    fill(0, 165);
+    fill(0, 175);
     stroke(frameColor);
     strokeWeight(3);
     rect(px, py, PANEL_W, PANEL_H, 14);
     noStroke();
   }
 
-  void drawLabels(Game g, float px, float py, int frameColor) {
-    float cx = px + PANEL_W * 0.5;
-    textAlign(CENTER, TOP);
+  // 注射ペンの絵。枠の左側に立てて置く。
+  // 画像が無ければ何も描かない(文字だけのパネルとして成立する)。
+  void drawPen(Game g, float px, float py) {
+    if (!USE_IMAGES || assets.manjaroPen == null) return;
 
-    setText(fontMid, 19);
+    float cx = px + 14 + PEN_BOX_W * 0.5;
+    sprites.drawCenteredByHeight(assets.manjaroPen, cx, py + 14, 74,
+                                 g.canShoot() ? 255 : 85);
+  }
+
+  void drawLabels(Game g, float px, float py, int frameColor) {
+    float tx = px + TEXT_LEFT;
+    textAlign(LEFT, TOP);
+
+    // 見出しは fontBig を使う。fontMid だと「ロ」が □ になることがあったため
+    setText(fontBig, 19);
     fill(frameColor);
-    text("マンジャロ", cx, py + 10);
+    text("マンジャロ", tx, py + 14);
 
     setText(fontSmall, 15);
     fill(255);
-    text(title(g), cx, py + 38);
-
-    textSize(12);
-    fill(255, 210);
-    text(subtitle(g), cx, py + 60);
+    text(title(g), tx, py + 42);
 
     textSize(11);
-    fill(255, 150);
-    text("週1回しか打てない薬", cx, py + 105);
+    fill(255, 205);
+    text(subtitle(g), tx, py + 64);
   }
+
+  // 一番下の一言。ゲームの都合ではなく薬のルールだと伝えるための行。
+  void drawFooter(float px, float py) {
+    setText(fontSmall, 11);
+    textAlign(CENTER, TOP);
+    fill(255, 145);
+    text("週1回しか打てない薬", px + PANEL_W * 0.5, py + PANEL_H - 22);
+  }
+
+  // エリアごとの使用権を、週の数だけ並べて見せる。
+  // 「あと何回打てるか」が数字を読まなくても分かる。
+  void drawWeekMarks(Game g, float px, float py, int frameColor) {
+    if (g.shotUsedInRegion == null) return;
+
+    int weeks = g.shotUsedInRegion.length;
+    float gap = 6;
+    float left = px + 14;
+    float total = PANEL_W - 28;
+    float w = (total - gap * (weeks - 1)) / weeks;
+    float y = py + PANEL_H - 40;
+
+    for (int i = 0; i < weeks; i++) {
+      float x = left + i * (w + gap);
+
+      if (g.shotUsedInRegion[i])   fill(255, 45);      // 使用済み
+      else if (i == g.regionIndex) fill(frameColor);   // 今週。打てる
+      else                         fill(255, 110);     // まだ先の週
+
+      rect(x, y, w, 8, 4);
+    }
+  }
+
+  // ============================================================
+  // エナジードリンク(パネルの外。持っているときだけ出る)
+  // ============================================================
 
   void drawSpeedItemIcon(Game g) {
     if (!g.speedItemHeld) return;
@@ -87,6 +154,7 @@ class ShotPanel {
     float iy = SCREEN_H * 0.7;
     fill(0, 180);
     rect(ix - 32, iy - 16, 64, 64, 8);
+
     if (assets.energy != null) {
       imageMode(CORNER);
       tint(255);
@@ -104,26 +172,5 @@ class ShotPanel {
     textAlign(CENTER, TOP);
     fill(C_GLU_HIGH);
     text("血糖 +" + int(ENERGY_GAIN), ix, iy + 50);
-  }
-
-  // エリアごとの使用権を、週の数だけ並べて見せる。
-  // 「あと何回打てるか」が数字を読まなくても分かる。
-  void drawWeekMarks(Game g, float px, float py, int frameColor) {
-    if (g.shotUsedInRegion == null) return;
-
-    int weeks = g.shotUsedInRegion.length;
-    float gap = 6;
-    float w = (PANEL_W - 32 - gap * (weeks - 1)) / weeks;
-    float y = py + 84;
-
-    for (int i = 0; i < weeks; i++) {
-      float x = px + 16 + i * (w + gap);
-
-      if (g.shotUsedInRegion[i])   fill(255, 45);      // 使用済み
-      else if (i == g.regionIndex) fill(frameColor);   // 今週。打てる
-      else                         fill(255, 110);     // まだ先の週
-
-      rect(x, y, w, 8, 4);
-    }
   }
 }

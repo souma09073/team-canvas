@@ -35,9 +35,14 @@ void loadFonts() {
   }
 
   println("使用フォント: " + usedFontName);
-  fontBig   = createFont(usedFontName, 30);
-  fontMid   = createFont(usedFontName, 20);
-  fontSmall = createFont(usedFontName, 14);
+
+  // 実際に使う文字サイズより大きめに作る。
+  // 20px で作った fontMid で「マンジャロ」の「ロ」だけが □ になる現象が出たため。
+  // 小さいサイズで作ると一部の字が作られないことがあるので、余裕を持たせている。
+  // 表示サイズは setText() の第2引数で決まるので、ここを変えてもレイアウトは変わらない。
+  fontBig   = createFont(usedFontName, 48);
+  fontMid   = createFont(usedFontName, 32);
+  fontSmall = createFont(usedFontName, 24);
 }
 
 // フォントと文字サイズをまとめて指定する。
