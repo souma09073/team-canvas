@@ -346,11 +346,16 @@ class Course {
       placeRowWoman(rowZ, openLane, i, wallFrom, isWall);
     }
 
-    // 密集地帯の手前に1体。「よけてから撃つか、撃ってから突っ込むか」の判断用。
-    // 壁のある区間には置かない。ぶつかると7秒撃てず、ロック中に壁へ到達して
-    // 回避不能になってしまうため。
+    // 密集地帯の手前に岩を1つ置く。「先によけてから入るか、勢いのまま突っ込むか」
+    // の判断を1回はさむため。以前はここに女性キャラを置いていた。
+    //
+    // 【岩は密集地帯の中には置けない】中は2レーンが食べ物で埋まっていて、
+    // 残る1レーンに岩を置くと3レーン全部が塞がり、回避不能になる。
+    // だから、まだ道が空いている手前に置く。
     if (wallFrom < 0) {
-      women.add(new Woman(d.zFrom - WOMAN_LEAD_DIST, rng.nextInt(3)));
+      float leadZ = d.zFrom - WOMAN_LEAD_DIST;
+      int leadLane = pickRockLane(leadZ);
+      if (leadLane >= 0) rocks.add(new Rock(leadZ, leadLane));
     }
   }
 
@@ -383,10 +388,18 @@ class Course {
   // 空きレーンに立つ女性。
   // 食べ物2個 + 空きレーンに女性 = 「食べる / ぶつかる / 事前に消す」の三択になる。
   // 終盤では壁の直前 FINAL_WOMAN_ROWS 列に必ず置く。
+  //
+  // 【女性キャラは廃止した】
+  // 障害物としての役割が岩と重複しており、ぶつかると撃てなくなる仕組みも
+  // 「マンジャロは1エリア1回」に変えた時点で意味が薄くなっていたため。
+  // 代わりに、密集地帯の手前へ岩を置いている(buildDenseZone の末尾)。
+  //
+  // 空きレーンに岩は置けない(3レーン全部が塞がって回避不能になる)ので、
+  // 密集地帯の中は食べ物だけになっている。
+  //
+  // 描画も当たり判定も消していない。women リストが空のまま動かないだけ。
+  // 復活させたいときは、ここで women.add(new Woman(rowZ, openLane)) を書けば戻る。
   void placeRowWoman(float rowZ, int openLane, int i, int wallFrom, boolean isWall) {
-    boolean isFinalWomanRow = wallFrom >= 0 && i >= wallFrom - FINAL_WOMAN_ROWS && i < wallFrom;
-    boolean isRandomWoman = !isWall && rng.next() < DENSE_WOMAN_CHANCE;
-    if (isFinalWomanRow || isRandomWoman) women.add(new Woman(rowZ, openLane));
   }
 
   // ============================================================
