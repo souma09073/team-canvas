@@ -264,6 +264,8 @@ void keyPressed() {
 
   if (game.state == STATE_READY) {
     if (key == ENTER || key == RETURN) game.reset();
+    // 動作確認用。1〜4 でそのステージから始める(Config の DEBUG_STAGE_SELECT で切る)
+    if (DEBUG_STAGE_SELECT && key >= '1' && key <= '4') game.startAtRegion(key - '1');
     return;
   }
 

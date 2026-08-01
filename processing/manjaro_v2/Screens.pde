@@ -60,6 +60,14 @@ class Screens {
     setText(fontSmall, 13);
     fill(255, 150);
     text("ESC キーで終了", SCREEN_W * 0.5, 520);
+
+    // 動作確認用の案内。Config の DEBUG_STAGE_SELECT を false にすると消える。
+    if (DEBUG_STAGE_SELECT) {
+      fill(120, 200, 255, 200);
+      String s = "【確認用】1〜4 でそのステージから開始   ";
+      for (int i = 0; i < regions.length; i++) s += (i + 1) + ":" + regions[i].name + "  ";
+      text(s, SCREEN_W * 0.5, 556);
+    }
   }
 
   // ============================================================

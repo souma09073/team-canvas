@@ -93,6 +93,7 @@ class Game {
   // float zoneTotal = 0;          // ゾーンの合計時間
   float bestTime = 0;           // ベストタイム。0 なら記録なし
   boolean newRecord = false;
+  boolean debugStarted = false; // 途中のステージから始めたか。true ならハイスコアに残さない
 
   // ============================================================
   // 開始・入力
@@ -116,6 +117,27 @@ class Game {
     course.build();
 
     startCountdown();   // いきなり走り出さず、必ず構える時間を置く
+  }
+
+  // ---- 途中のステージから始める(動作確認用)----
+  //
+  // 北海道だけ直したいのに毎回沖縄から走るのは時間の無駄なので、
+  // タイトル画面で 1〜4 を押すとそのステージから始められるようにしてある。
+  //
+  // 【通しのタイムとは比べられない】手前のステージを走っていないぶん
+  // 経過タイムが短くなる。だからハイスコアは記録しない(goal() 側で弾く)。
+  // 提出版で無効にしたいときは Config.pde の DEBUG_STAGE_SELECT を false に。
+  void startAtRegion(int index) {
+    if (index < 0 || index >= regions.length) return;
+
+    reset();                        // 通常の初期化を全部通してから、位置だけ差し替える
+    debugStarted = (index > 0);     // 途中から始めた記録。ゴールしても記録を残さない
+
+    regionIndex = index;
+    z = regions[index].startZ;
+    lane = 1;  x = laneToX(1);
+
+    startCountdown();               // 血糖のリセットとカウントダウンをやり直す
   }
 
   // ---- 走り出す前のカウントダウン ----
@@ -538,7 +560,9 @@ class Game {
   void goal() {
     state = STATE_GOAL;
     playOneShot(soundClear);
-    newRecord = (bestTime <= 0 || elapsed < bestTime);
+    // 途中のステージから始めた回は記録しない。手前を走っていないぶんタイムが短く、
+    // 通しで走った記録を塗り替えてしまうため。
+    newRecord = !debugStarted && (bestTime <= 0 || elapsed < bestTime);
     if (newRecord) {
       bestTime = elapsed;
       saveBest();
