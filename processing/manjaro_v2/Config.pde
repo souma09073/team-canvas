@@ -142,7 +142,7 @@ final float ZONE_SPEED_MULT     = 1.8;   // 発動中の速度倍率
 //   上げるとコースも自動で長くなるので、各エリアのタイムは25秒のまま変わらない。
 //   「全体的にもっと速く」と思ったら、この数字を 1.2 → 1.4 → 1.6 と振ってみること。
 //   レーン移動の速さも一緒に上がるので、操作が置いていかれることはない。
-final float SPEED_SCALE = 1.3;
+final float SPEED_SCALE = 1.1;
 
 final float LANE_WIDTH        = 4;
 final float LANE_CHANGE_BASE  = 24;    // レーン移動の速さの基準値(units/秒)
