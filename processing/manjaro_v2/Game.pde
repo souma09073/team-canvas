@@ -501,7 +501,7 @@ class Game {
   }
 
   void restartFromCheckpoint() {
-    playOneShot(soundRetry);
+    playOneShot(soundClear);
     if (regions == null || regions.length == 0) { reset(); return; }
 
     // ゴール後のリトライは、第1区画の最初へ戻す。
@@ -559,7 +559,7 @@ class Game {
 
   void goal() {
     state = STATE_GOAL;
-    playOneShot(soundClear);
+    playOneShot(soundgoal);
     // 途中のステージから始めた回は記録しない。手前を走っていないぶんタイムが短く、
     // 通しで走った記録を塗り替えてしまうため。
     newRecord = !debugStarted && (bestTime <= 0 || elapsed < bestTime);

@@ -24,7 +24,7 @@
 
 import processing.sound.*;
 
-SoundFile soundPlayMusic1, soundPlayMusic2, soundPlayMusic3,soundPlayMusic4, soundPlayMusic5, soundRunning, soundBoost, soundRetry, soundGameOver, soundClear, soundScreenTransition, soundMovingSea, soundGetManjaro, soundHealthMax, soundEat1, soundEat2;
+SoundFile soundPlayMusic1, soundPlayMusic2, soundPlayMusic3,soundPlayMusic4, soundPlayMusic5, soundRunning, soundBoost, soundRetry, soundGameOver, soundClear, soundScreenTransition, soundMovingSea, soundGetManjaro, soundHealthMax, soundEat1, soundEat2, soundeat3 ,soundgoal;
 
 Game game;
 View3D view;
@@ -89,12 +89,14 @@ void setup() {
   soundEat1 = new SoundFile(this, "sounds/リンゴをかじる.mp3");//食べ物食べる音1
   soundEat2 = new SoundFile(this, "sounds/お菓子を食べる1.mp3");//食べ物食べる音2
   soundHealthMax = new SoundFile(this, "sounds/ゲージ回復2.mp3");//マンジャロ使用可能になったとき　あるいは何かのゲージがたまったとき
-  soundClear = new SoundFile(this, "sounds/成功音.mp3");//クリア!!
+  soundClear = new SoundFile(this, "sounds/成功音.mp3");//チェックポイント到達音
   soundMovingSea = new SoundFile(this, "sounds/海岸1.mp3");// 船の移動
   soundScreenTransition = new SoundFile(this, "sounds/土の上を走る.mp3");//画面切り替えの、走るような音
   soundRunning = new SoundFile(this, "sounds/アスファルトの上を走る1.mp3");//人が走る音
   soundBoost = new SoundFile(this, "sounds/超高速ダッシュ.mp3");//加速する
   soundRetry = new SoundFile(this, "sounds/決定ボタンを押す33.mp3");//リトライ音
+  soundeat3 = new SoundFile(this, "sounds/スイッチ（ピロリーン）.mp3");//食べる音
+  soundgoal= new SoundFile(this, "sounds/ゲームクリア(壮大).mp3");//ゲームクリア音
 
   float masterVol = 0.25;
   soundPlayMusic1.amp(masterVol);
@@ -112,6 +114,8 @@ void setup() {
   soundHealthMax.amp(masterVol);
   soundEat1.amp(masterVol);
   soundEat2.amp(masterVol);
+  soundeat3.amp(masterVol);
+  soundgoal.amp(masterVol);
   soundScreenTransition.amp(masterVol);
 
 }
@@ -225,8 +229,7 @@ void playOneShot(SoundFile s) {
 }
 
 void playFoodSound() {
-  if (random(1) < 0.5) playOneShot(soundEat1);
-  else playOneShot(soundEat2);
+  playOneShot(soundeat3);
 }
 
 void draw() {
