@@ -98,6 +98,12 @@ class ShotPanel {
       textAlign(CENTER, CENTER);
       text("⚡", ix, iy + 1);
     }
+
+    // 代償を数字で出しておく。使ってから「なぜ倒れたのか」を悩ませないため。
+    setText(fontSmall, 12);
+    textAlign(CENTER, TOP);
+    fill(C_GLU_HIGH);
+    text("血糖 +" + int(ENERGY_GAIN), ix, iy + 50);
   }
 
   // エリアごとの使用権を、週の数だけ並べて見せる。

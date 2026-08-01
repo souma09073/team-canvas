@@ -34,7 +34,8 @@ class View3D {
     float speedRatio = speedAtZ(g.z) / baseSpeedRef();   // 序盤1.0 → ゴール2.8
 
     // 速度が上がるほど画角を広げる。視界の端が流れてスピード感が出る。
-    float fov = FOV_BASE + (speedRatio - 1) * 10;
+    // エナジードリンク中はさらに広げる。視界の端が一気に流れて、速さが体で分かる。
+    float fov = FOV_BASE + (speedRatio - 1) * 10 + (g.speedItemActive > 0 ? 14 : 0);
     perspective(radians(fov), float(width) / float(height), 1, DRAW_DIST * 1.6);
 
     // 主人公の真後ろ上空から、少し前方を見る
@@ -84,6 +85,67 @@ class View3D {
     drawWomen(g);
     drawPort(g);
     drawPlayer(g);
+    drawEnergyStreaks(g);   // 光の筋は主人公より手前。追い越していくように見せる
+  }
+
+  // ============================================================
+  // エナジードリンクの発光演出
+  //
+  // カメラは一度も回らないので、板を立てるだけで常に正面を向く。
+  // だから ellipse() をそのまま置けば、それが光の輪になる(ビルボードと同じ理屈)。
+  //
+  // 光は「主人公の奥に広がる輪」と「追い越していく筋」の2枚構成。
+  // 輪だけだと止まって見え、筋だけだと主人公が光って見えない。
+  // ============================================================
+
+  // 主人公の後ろに広がる金色の光。外側ほど薄く重ねて、にじみを作る。
+  void drawEnergyAura(Game g) {
+    if (g.speedItemActive <= 0) return;
+
+    float life  = g.speedItemActive / ENERGY_DURATION;   // 1 → 0。切れる直前に弱まる
+    float pulse = 0.82 + 0.18 * sin(millis() * 0.025);   // 脈打たせて「生きている」感じを出す
+
+    noLights();          // 照明を掛けると光が濁る
+    noStroke();
+
+    pushMatrix();
+    translate(g.x, PLAYER_IMG_HEIGHT * 0.45, g.z + 0.6);
+    for (int i = 4; i >= 1; i--) {
+      float d = PLAYER_IMG_HEIGHT * (0.7 + i * 0.5) * pulse;
+      fill(255, 225, 120, 46 * life / i);   // 外側(iが大きい)ほど薄い
+      ellipse(0, 0, d, d * 1.15);
+    }
+    popMatrix();
+
+    applySceneLights();   // 次に描くものために照明を戻す
+  }
+
+  // 主人公を追い越して流れる光の筋。速さそのものを見せる。
+  void drawEnergyStreaks(Game g) {
+    if (g.speedItemActive <= 0) return;
+
+    float life = g.speedItemActive / ENERGY_DURATION;
+
+    noLights();
+    noStroke();
+    fill(255, 245, 190, 150 * life);
+
+    for (int i = 0; i < 16; i++) {
+      float angle  = i * 1.17;                  // 主人公の周りに散らす
+      float radius = 2.2 + (i % 4) * 0.9;
+      float sx = g.x + cos(angle) * radius;
+      float sy = 2.5 + sin(angle) * 1.6;
+
+      // 奥から手前へ流れる。時間で位置をずらすだけで流れて見える。
+      float sz = g.z + 22 - ((millis() * 0.06 + i * 7) % 30);
+
+      pushMatrix();
+      translate(sx, sy, sz);
+      box(0.13, 0.13, 2.8);   // 細長い箱。前後に伸びているので線に見える
+      popMatrix();
+    }
+
+    applySceneLights();
   }
 
   // ---- 地面 ----
@@ -454,6 +516,8 @@ class View3D {
     float bobRate = 6 + 8 * (speedAtZ(g.z) / baseSpeedRef());
     float bob = abs(sin(g.elapsed * bobRate)) * 0.18;
     float pop = max(0, g.foodPop / FOOD_POP_SEC);   // 食べた瞬間に一瞬ふくらむ
+
+    drawEnergyAura(g);      // 光は主人公より奥に置く。後ろから照らされて見える
 
     if (USE_IMAGES && assets.player != null) {
       // 影は必ず地面(y=0)に置く。主人公は跳ねるので、影が離れるほど跳んで見える。

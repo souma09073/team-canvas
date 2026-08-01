@@ -159,10 +159,16 @@ class Game {
     playOneShot(soundGetManjaro);
   }
 
+  // エナジードリンクを飲む。
+  //
+  // 速く走れる代わりに、血糖が一気に跳ね上がる。糖分そのものだから。
+  // 「拾ったら即使う」が常に正解にならないよう、代償を持たせている。
+  // 低血糖で追い詰められているときほど強く、余裕があるときに使うと自分が倒れる。
   void trySpeedItem() {
     if (state != STATE_RUNNING || !speedItemHeld || speedItemActive > 0) return;
     speedItemHeld = false;
-    speedItemActive = ZONE_DURATION;
+    speedItemActive = ENERGY_DURATION;
+    glucose += ENERGY_GAIN;        // 代償。上限100は checkHyperglycemia が抑える
     playOneShot(soundBoost);
   }
 
@@ -326,7 +332,7 @@ class Game {
   // 速度を変える要素はゾーンだけ(食べた瞬間の加速はコントロールを失うので廃止)。
   // 止まっているときは update の冒頭で抜けるので、ここには来ない。
   void moveForward(float dt) {
-    float mult = speedItemActive > 0 ? ZONE_SPEED_MULT : 1;
+    float mult = speedItemActive > 0 ? ENERGY_SPEED_MULT : 1;
     z += runSpeed() * mult * dt;
   }
 
